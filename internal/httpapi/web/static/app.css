@@ -955,3 +955,19 @@ body.auth { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .9
   .auth-main { padding: 24px 16px; }
   .auth-card { padding: 24px 20px 20px; }
 }
+
+/* Reserve the scrollbar gutter so centered chrome never shifts between pages
+   that do and do not scroll. */
+html { scrollbar-gutter: stable; }
+@supports not (scrollbar-gutter: stable) {
+  html { overflow-y: scroll; }
+}
+
+/* Captcha block on the login form */
+.captcha-row { display: flex; align-items: center; gap: 10px; }
+.captcha-row .captcha-img {
+  display: block; height: 44px; border-radius: 10px;
+  border: 1px solid var(--border); overflow: hidden;
+  background: var(--surface-3);
+}
+.captcha-row input { flex: 1 1 auto; letter-spacing: .18em; text-transform: uppercase; }

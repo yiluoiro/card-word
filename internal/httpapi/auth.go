@@ -37,7 +37,24 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, "/admin")
 		return
 	}
-	s.render(w, r, "admin_login", map[string]any{"Title": "管理员登录"})
+	s.renderLogin(w, r, "")
+}
+
+// renderLogin issues a fresh captcha and renders the form. Every failed attempt
+// rotates the code, so a stale answer is never reusable.
+func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, msg string) {
+	token, code, err := s.issueCaptcha()
+	if err != nil {
+		s.log.Error("captcha generation failed", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "登录页初始化失败。")
+		return
+	}
+	s.setCaptchaCookie(w, token)
+	s.render(w, r, "admin_login", map[string]any{
+		"Title":   "管理员登录",
+		"Captcha": captchaSVG(code),
+		"Error":   msg,
+	})
 }
 
 func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +73,12 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "请输入用户名和密码。")
 		return
 	}
+	if !s.verifyCaptcha(s.captchaFromRequest(r), r.FormValue("captcha")) {
+		_ = s.db.Audit(r.Context(), username, "auth.login.captcha_failed", "", ip, "invalid captcha")
+		s.renderLogin(w, r, "验证码不正确，请重新输入。")
+		return
+	}
+	s.clearCaptchaCookie(w)
 	if wait, locked := s.guard.locked(strings.ToLower(username)); locked {
 		s.log.Warn("login rejected by account lock", "username", username, "ip", ip, "retry_after", wait.String())
 		s.renderError(w, r, http.StatusTooManyRequests, "该账号连续登录失败次数过多，请 15 分钟后再试。")

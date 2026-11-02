@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"context"
+	"encoding/base64"
 	"io"
 	"log/slog"
 	"net/http"
@@ -112,7 +113,7 @@ func newHarness(t *testing.T) *harness {
 
 func (h *harness) csrf() string {
 	h.t.Helper()
-	base, _ := url.Parse(h.server.URL)
+	base, _ := url.Parse(h.server.URL + "/admin/login")
 	for _, c := range h.client.Jar.Cookies(base) {
 		if c.Name == "cw_csrf" {
 			return c.Value
@@ -205,6 +206,7 @@ func TestStorefrontAndAdminFlow(t *testing.T) {
 	login := h.postForm("/admin/login", url.Values{
 		"username": {"operator"},
 		"password": {"super-secret-passphrase"},
+		"captcha":  {h.captcha()},
 	})
 	if login.StatusCode != http.StatusSeeOther || login.Header.Get("Location") != "/admin" {
 		t.Fatalf("login failed: %d %s", login.StatusCode, login.Header.Get("Location"))
@@ -375,4 +377,28 @@ func TestAPITokensAndScopes(t *testing.T) {
 func TestMain(m *testing.M) {
 	code := m.Run()
 	os.Exit(code)
+}
+
+// captcha reads the expected answer from the signed captcha cookie. The cookie
+// is HttpOnly, which only hides it from page scripts - the test owns the jar.
+func (h *harness) captcha() string {
+	base, _ := url.Parse(h.server.URL + "/admin/login")
+	for _, c := range h.client.Jar.Cookies(base) {
+		if c.Name != "cw_cap" {
+			continue
+		}
+		parts := strings.SplitN(c.Value, ".", 2)
+		if len(parts) != 2 {
+			return ""
+		}
+		raw, err := base64.RawURLEncoding.DecodeString(parts[0])
+		if err != nil {
+			return ""
+		}
+		fields := strings.SplitN(string(raw), "|", 2)
+		if len(fields) == 2 {
+			return fields[0]
+		}
+	}
+	return ""
 }

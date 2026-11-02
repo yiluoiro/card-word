@@ -374,6 +374,12 @@
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <label>用户名<input type="text" name="username" autocomplete="username" required autofocus></label>
       <label>密码<input type="password" name="password" autocomplete="current-password" required></label>
+      <label>验证码
+        <span class="captcha-row">
+          <span class="captcha-img">{{.Captcha}}</span>
+          <input type="text" name="captcha" autocomplete="off" inputmode="text" maxlength="4" placeholder="输入图中 4 位字符" required>
+        </span>
+      </label>
       <button class="btn primary block lg" type="submit">{{template "i_lock" .}} 登录</button>
     </form>
     <div class="auth-foot">{{template "i_shield" .}} 所有管理操作都会记录来源 IP 与时间。</div>

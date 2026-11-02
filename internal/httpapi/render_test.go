@@ -37,6 +37,7 @@ func TestAdminPagesRender(t *testing.T) {
 	login := h.postForm("/admin/login", url.Values{
 		"username": {"operator"},
 		"password": {"super-secret-passphrase"},
+		"captcha":  {h.captcha()},
 	})
 	if login.StatusCode != http.StatusSeeOther {
 		t.Fatalf("login failed: %d", login.StatusCode)
