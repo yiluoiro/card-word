@@ -187,6 +187,8 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/tokens", s.staff(store.RoleAdmin, s.handleAdminTokenCreate))
 	s.mux.Handle("POST /admin/tokens/{id}/revoke", s.staff(store.RoleAdmin, s.handleAdminTokenRevoke))
 	s.mux.Handle("GET /admin/audit", s.staff(store.RoleViewer, s.handleAdminAudit))
+	s.mux.Handle("GET /admin/audit/export.csv", s.staff(store.RoleAdmin, s.handleAdminAuditExport))
+	s.mux.Handle("POST /admin/settings/test-email", s.staff(store.RoleAdmin, s.handleAdminTestEmail))
 	s.mux.Handle("GET /admin/account", s.staff(store.RoleViewer, s.handleAdminAccount))
 	s.mux.Handle("POST /admin/account/password", s.admin(s.handleAdminChangePassword))
 	s.mux.Handle("GET /admin/users", s.staff(store.RoleOwner, s.handleAdminUsers))

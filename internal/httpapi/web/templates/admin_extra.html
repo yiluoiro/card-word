@@ -244,6 +244,22 @@
       <span class="muted small">保存后立即生效</span>
     </div>
   </form>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>发送测试邮件</h3>
+      <span class="panel-sub">使用上面已保存的 SMTP 配置，验证发件是否可用</span>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="/admin/settings/test-email" class="row-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>收件邮箱<input type="email" name="to" placeholder="you@example.com" required></label>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn" type="submit">{{template "i_upload" .}} 发送测试</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </main>
 </div>
 </body>
@@ -268,6 +284,9 @@
     <button class="btn sm" type="submit">{{template "i_search" .}} 过滤</button>
   </form>
   {{template "pager" .}}
+  <div class="actions" style="margin-bottom:12px">
+    <a class="btn sm" href="/admin/audit/export.csv?action={{.Action}}">{{template "i_download" .}} 导出 CSV</a>
+  </div>
 
   <div class="panel">
     <div class="panel-body flush">
