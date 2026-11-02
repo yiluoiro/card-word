@@ -407,6 +407,22 @@
     </div>
   </div>
 
+  <div class="panel">
+    <div class="panel-head">
+      <h3>订单备注</h3>
+      <span class="panel-sub">仅后台可见，写入审计</span>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="/admin/orders/{{.Order.OrderNo}}/note" class="form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>备注
+          <textarea name="note" rows="3" placeholder="例如：买家已联系，等待补发">{{.Order.Note}}</textarea>
+        </label>
+        <div class="actions"><button class="btn sm" type="submit">保存备注</button></div>
+      </form>
+    </div>
+  </div>
+
   {{if .Cards}}
   <div class="panel">
     <div class="panel-head"><h3>已发卡密</h3><div class="actions"><button class="btn sm" type="button" data-copy-all="#admin-keys">{{template "i_copy" .}} 复制全部</button></div></div>

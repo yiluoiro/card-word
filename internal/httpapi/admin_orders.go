@@ -133,6 +133,26 @@ func (s *Server) handleAdminRetry(w http.ResponseWriter, r *http.Request) {
 	flashRedirect(w, r, "/admin/orders/"+orderNo, "已补发", "")
 }
 
+// handleAdminOrderNote stores an operator note on an order.
+func (s *Server) handleAdminOrderNote(w http.ResponseWriter, r *http.Request) {
+	orderNo := r.PathValue("no")
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "表单格式错误。")
+		return
+	}
+	note := strings.TrimSpace(r.FormValue("note"))
+	if len(note) > 1000 {
+		flashRedirect(w, r, "/admin/orders/"+orderNo, "", "备注过长（最多 1000 字）。")
+		return
+	}
+	if err := s.db.SetOrderNote(r.Context(), orderNo, note); err != nil {
+		flashRedirect(w, r, "/admin/orders/"+orderNo, "", "保存失败。")
+		return
+	}
+	s.audit(r, "order.note", orderNo, note)
+	flashRedirect(w, r, "/admin/orders/"+orderNo, "备注已保存", "")
+}
+
 func (s *Server) handleAdminCloseOrder(w http.ResponseWriter, r *http.Request) {
 	orderNo := r.PathValue("no")
 	if err := s.db.CloseOrder(r.Context(), orderNo); err != nil {

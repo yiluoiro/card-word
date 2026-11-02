@@ -173,6 +173,7 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/orders/{no}/retry", s.staff(store.RoleAdmin, s.handleAdminRetry))
 	s.mux.Handle("POST /admin/orders/{no}/close", s.staff(store.RoleAdmin, s.handleAdminCloseOrder))
 	s.mux.Handle("POST /admin/orders/{no}/refund", s.staff(store.RoleAdmin, s.handleAdminRefund))
+	s.mux.Handle("POST /admin/orders/{no}/note", s.staff(store.RoleAdmin, s.handleAdminOrderNote))
 	s.mux.Handle("GET /admin/coupons", s.staff(store.RoleViewer, s.handleAdminCoupons))
 	s.mux.Handle("POST /admin/coupons", s.staff(store.RoleAdmin, s.handleAdminCouponCreate))
 	s.mux.Handle("POST /admin/coupons/{id}/delete", s.staff(store.RoleAdmin, s.handleAdminCouponDelete))
