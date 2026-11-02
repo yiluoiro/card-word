@@ -124,6 +124,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("GET /readyz", s.handleReady)
 	s.mux.HandleFunc("GET /version", s.handleVersion)
+	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
+	s.mux.HandleFunc("GET /robots.txt", s.handleRobots)
 
 	// Static assets and plugin assets.
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler()))

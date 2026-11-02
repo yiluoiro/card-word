@@ -81,11 +81,30 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusNotFound, "商品不存在或已下架。")
 		return
 	}
+	var related []store.Product
+	if product.CategoryID.Valid {
+		if list, err := s.db.ListProducts(r.Context(), store.ProductFilter{
+			Status:     store.ProductActive,
+			CategoryID: product.CategoryID.Int64,
+			Limit:      6,
+		}); err == nil {
+			for _, p := range list {
+				if p.ID == product.ID {
+					continue
+				}
+				related = append(related, p)
+				if len(related) == 3 {
+					break
+				}
+			}
+		}
+	}
 	s.render(w, r, "product", map[string]any{
 		"Title":    product.Name,
 		"Product":  product,
 		"Drivers":  s.availableDrivers(),
 		"Currency": product.Currency,
+		"Related":  related,
 	})
 }
 

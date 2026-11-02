@@ -134,7 +134,48 @@
       <div class="prose" style="margin-top:8px">{{.Product.Description}}</div>
     </div>
     {{end}}
+    <div class="panel-body" style="border-top:1px solid var(--border)">
+      <h4>交付与售后</h4>
+      <ul class="checklist" style="margin-top:10px">
+        <li>{{template "i_bolt" .}} 支付成功后立即自动发货，卡密在订单页展示并同步邮件</li>
+        <li>{{template "i_lock" .}} 卡密加密存储，仅在发货与人工查看时解密</li>
+        <li>{{template "i_shield" .}} 订单凭查询凭证访问，浏览器会话 30 分钟内有效</li>
+      </ul>
+    </div>
+    <div class="panel-body" style="border-top:1px solid var(--border)">
+      <h4>常见问题</h4>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-weight:600">多久能收到卡密？</summary>
+        <p class="small muted" style="margin-top:8px">支付回调确认后通常在数秒内完成发货；如遇库存不足会转为「已支付待补发」，由管理员处理。</p>
+      </details>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-weight:600">支付完成后页面没刷新怎么办？</summary>
+        <p class="small muted" style="margin-top:8px">用订单号与查询凭证在「订单查询」中打开订单，或直接刷新订单页。</p>
+      </details>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-weight:600">支持退款吗？</summary>
+        <p class="small muted" style="margin-top:8px">虚拟商品一经发出不支持无理由退款；若卡密本身无法使用，请联系站长核实处理。</p>
+      </details>
+    </div>
   </div>
+
+  {{if .Related}}
+  <h3 class="section-title">同类商品</h3>
+  <div class="grid">
+    {{range .Related}}
+    <a class="card product" href="/p/{{.Slug}}">
+      <div class="card-head">
+        <div class="name">{{.Name}}</div>
+        {{if gt .Stock 0}}<span class="badge ok"><span class="dot"></span>有货</span>{{else}}<span class="badge muted">缺货</span>{{end}}
+      </div>
+      <div class="card-foot">
+        <span class="price">{{money .PriceCents .Currency}}</span>
+        <span class="btn sm primary">查看 {{template "i_arrow_right" .}}</span>
+      </div>
+    </a>
+    {{end}}
+  </div>
+  {{end}}
 </main>
 {{template "footer" .}}
 </body>
