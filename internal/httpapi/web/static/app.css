@@ -50,6 +50,73 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
+/* Dark theme. Applied via data-theme on <html> so the toggle survives reloads. */
+:root[data-theme="dark"] {
+  --bg: #0b0f19;
+  --surface: #111827;
+  --surface-2: #0f1522;
+  --surface-3: #1a2233;
+  --border: #1f2937;
+  --border-strong: #2b3648;
+  --text: #e6e8ef;
+  --text-2: #a8b0c2;
+  --text-3: #7c8598;
+  --text-4: #5f6878;
+
+  --primary: #7c83ff;
+  --primary-hover: #9aa0ff;
+  --primary-weak: #1e2440;
+  --primary-weak-2: #2a3157;
+  --primary-ring: rgba(124, 131, 255, .22);
+
+  --ok: #4ade80;
+  --ok-bg: #0d2f22;
+  --ok-border: #1c5c40;
+  --warn: #fbbf24;
+  --warn-bg: #2f2410;
+  --warn-border: #5c451a;
+  --danger: #f87171;
+  --danger-bg: #2f1414;
+  --danger-border: #5c2020;
+  --info: #67d4f0;
+  --info-bg: #0e2430;
+  --info-border: #1c4a5c;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4), 0 2px 6px rgba(0, 0, 0, .35);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, .45), 0 12px 28px rgba(0, 0, 0, .5);
+}
+
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .shop-header { background: rgba(17, 24, 39, .88); }
+
+:root[data-theme="dark"] .hero {
+  background:
+    radial-gradient(900px 320px at 12% -10%, rgba(99, 102, 241, .28), transparent 62%),
+    radial-gradient(700px 260px at 92% 0%, rgba(14, 165, 233, .18), transparent 60%),
+    linear-gradient(180deg, #131c2d, #0f1522);
+}
+:root[data-theme="dark"] .hero::after {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, .05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, .05) 1px, transparent 1px);
+}
+:root[data-theme="dark"] .auth {
+  background:
+    radial-gradient(700px 340px at 20% 0%, rgba(99, 102, 241, .25), transparent 62%),
+    radial-gradient(600px 300px at 90% 20%, rgba(14, 165, 233, .16), transparent 60%),
+    var(--bg);
+}
+:root[data-theme="dark"] .panel > .panel-head { background: linear-gradient(180deg, #131b2a, #111827); }
+:root[data-theme="dark"] .table tbody tr:hover { background: #141c2b; }
+:root[data-theme="dark"] .btn:hover { background: #1a2233; }
+:root[data-theme="dark"] .btn.ghost:hover { background: #1a2233; }
+:root[data-theme="dark"] .nav-item:hover { background: #1a2233; }
+:root[data-theme="dark"] .keys li { background: #0f1522; }
+:root[data-theme="dark"] .inline-msg { background: #0f1522; }
+:root[data-theme="dark"] .chip { background: var(--surface); }
+:root[data-theme="dark"] .avatar { background: var(--primary-weak); }
+
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }

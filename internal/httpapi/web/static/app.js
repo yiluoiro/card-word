@@ -3,6 +3,21 @@
 (function () {
   "use strict";
 
+  // Theme toggle: persisted per browser, defaults to light.
+  var root = document.documentElement;
+  var savedTheme = null;
+  try { savedTheme = window.localStorage.getItem("cw-theme"); } catch (e) { /* private mode */ }
+  if (savedTheme === "dark" || savedTheme === "light") {
+    root.setAttribute("data-theme", savedTheme);
+  }
+  document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { window.localStorage.setItem("cw-theme", next); } catch (e) { /* ignore */ }
+    });
+  });
+
   // Auto-submit payment forms (provider redirect handoff).
   document.querySelectorAll("form[data-autosubmit]").forEach(function (form) {
     form.submit();

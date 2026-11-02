@@ -25,6 +25,7 @@
       {{else}}
         <a href="/admin/login" class="btn sm ghost">{{template "i_lock" .}} 管理</a>
       {{end}}
+      <button class="btn ghost sm" type="button" data-theme-toggle title="切换深浅色">{{template "i_moon" .}}</button>
     </nav>
   </div>
 </header>
@@ -92,6 +93,7 @@
   <div class="topbar-actions">
     {{if .Site.Maintenance}}<span class="badge warn"><span class="dot"></span>维护模式</span>{{end}}
     <a class="btn ghost sm" href="/" target="_blank" rel="noopener">{{template "i_external" .}} 访问店铺</a>
+    <button class="btn ghost sm" type="button" data-theme-toggle title="切换深浅色">{{template "i_moon" .}}</button>
   </div>
 </header>
 {{end}}
@@ -156,5 +158,6 @@
 {{define "i_upload"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>{{end}}
 {{define "i_download"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>{{end}}
 {{define "i_bolt"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>{{end}}
+{{define "i_moon"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/></svg>{{end}}
 {{define "i_eye"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>{{end}}
 {{define "i_users"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{{end}}
