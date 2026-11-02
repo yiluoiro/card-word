@@ -74,16 +74,16 @@
     </div>
     <div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
+        <table class="table stack">
           <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>状态</th><th>下单时间</th></tr></thead>
           <tbody>
           {{range .Orders}}
             <tr>
-              <td><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
-              <td><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
-              <td class="num">{{money .TotalCents .Currency}}</td>
-              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="secondary-cell">{{datetime .CreatedAt}}</td>
+              <td data-label="订单号"><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
+              <td data-label="商品"><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
+              <td class="num" data-label="金额">{{money .TotalCents .Currency}}</td>
+              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="secondary-cell" data-label="下单时间">{{datetime .CreatedAt}}</td>
             </tr>
           {{else}}
             <tr><td colspan="5" class="muted">还没有订单，前台下单后会出现在这里。</td></tr>
@@ -132,21 +132,21 @@
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
+        <table class="table stack">
           <thead><tr><th style="width:34px"><input type="checkbox" data-check-all="bulkProducts" aria-label="全选商品"></th><th>商品</th><th>分类</th><th class="num">价格</th><th class="num">库存</th><th>状态</th><th class="num">操作</th></tr></thead>
           <tbody>
           {{range .Products}}
             <tr>
-              <td><input type="checkbox" name="ids" value="{{.ID}}" form="bulkProducts" aria-label="选择 {{.Name}}"></td>
-              <td>
+              <td data-label="选择"><input type="checkbox" name="ids" value="{{.ID}}" form="bulkProducts" aria-label="选择 {{.Name}}"></td>
+              <td data-label="商品">
                 <div class="primary-cell">{{.Name}}</div>
                 <div class="secondary-cell mono">/p/{{.Slug}}</div>
               </td>
-              <td class="secondary-cell">{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
-              <td class="num">{{money .PriceCents .Currency}}</td>
-              <td class="num">{{if gt .Stock 0}}<span class="badge ok">{{.Stock}}</span>{{else}}<span class="badge muted">0</span>{{end}}</td>
-              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="actions">
+              <td class="secondary-cell" data-label="分类">{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
+              <td class="num" data-label="价格">{{money .PriceCents .Currency}}</td>
+              <td class="num" data-label="库存">{{if gt .Stock 0}}<span class="badge ok">{{.Stock}}</span>{{else}}<span class="badge muted">0</span>{{end}}</td>
+              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="actions" data-label="操作">
                 <a class="btn sm" href="/admin/products/{{.ID}}">编辑</a>
                 <a class="btn sm" href="/admin/products/{{.ID}}/cards">{{template "i_key" .}} 卡密</a>
                 <form method="post" action="/admin/products/{{.ID}}/delete" class="inline" data-confirm="删除商品会同时删除其全部卡密，确认继续？">
@@ -304,18 +304,18 @@
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
+        <table class="table stack">
           <thead><tr><th style="width:34px"><input type="checkbox" data-check-all="bulkCards" aria-label="全选卡密"></th><th>ID</th><th>卡密</th><th>标签</th><th>状态</th><th>售出时间</th><th class="num">操作</th></tr></thead>
           <tbody>
           {{range .Cards}}
             <tr>
-              <td><input type="checkbox" name="ids" value="{{.ID}}" form="bulkCards" aria-label="选择卡密 {{.ID}}"></td>
-              <td class="mono secondary-cell">{{.ID}}</td>
-              <td class="mono">{{.Masked}}</td>
-              <td class="secondary-cell">{{if .Label}}{{.Label}}{{else}}—{{end}}</td>
-              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="secondary-cell">{{if .SoldAt}}{{datetime .SoldAt}}{{else}}—{{end}}</td>
-              <td class="actions">
+              <td data-label="选择"><input type="checkbox" name="ids" value="{{.ID}}" form="bulkCards" aria-label="选择卡密 {{.ID}}"></td>
+              <td class="mono secondary-cell" data-label="ID">{{.ID}}</td>
+              <td class="mono" data-label="卡密">{{.Masked}}</td>
+              <td class="secondary-cell" data-label="标签">{{if .Label}}{{.Label}}{{else}}—{{end}}</td>
+              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="secondary-cell" data-label="售出时间">{{if .SoldAt}}{{datetime .SoldAt}}{{else}}—{{end}}</td>
+              <td class="actions" data-label="操作">
                 <button class="btn sm" type="button" data-reveal="{{.ID}}">{{template "i_eye" .}} 查看</button>
                 {{if eq .Status "available"}}
                 <form method="post" action="/admin/cards/{{.ID}}/disable" class="inline" data-confirm="停用后该卡密不再参与发货，确认？">
@@ -370,17 +370,17 @@
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table sticky-first">
+        <table class="table sticky-first stack">
           <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>买家</th><th>状态</th><th>时间</th></tr></thead>
           <tbody>
           {{range .Orders}}
             <tr>
-              <td><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
-              <td><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
-              <td class="num">{{money .TotalCents .Currency}}</td>
-              <td class="secondary-cell">{{if .Email}}{{maskEmail .Email}}{{else}}—{{end}}</td>
-              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="secondary-cell">{{datetime .CreatedAt}}</td>
+              <td data-label="订单号"><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
+              <td data-label="商品"><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
+              <td class="num" data-label="金额">{{money .TotalCents .Currency}}</td>
+              <td class="secondary-cell" data-label="买家">{{if .Email}}{{maskEmail .Email}}{{else}}—{{end}}</td>
+              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="secondary-cell" data-label="时间">{{datetime .CreatedAt}}</td>
             </tr>
           {{else}}
             <tr><td colspan="6" class="muted">没有符合条件的订单。</td></tr>

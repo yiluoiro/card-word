@@ -822,3 +822,136 @@ body.auth { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .9
   border: 1px solid var(--border);
 }
 .card.product .product-cover { margin-bottom: 2px; }
+
+/* ==================================================================
+   responsive v2 — centered content, drawer nav, stacked tables
+   ================================================================== */
+
+/* Center the work area; wide monitors no longer leave a dead zone right. */
+.content { margin-inline: auto; }
+.content.wide { max-width: 1560px; }
+
+@media (min-width: 1440px) {
+  .content { max-width: 1380px; padding-left: 40px; padding-right: 40px; }
+}
+
+.nav-toggle { display: none; }
+.nav-scrim {
+  position: fixed; inset: 0; z-index: 55;
+  background: rgba(10, 13, 22, .46);
+  backdrop-filter: blur(2px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease;
+}
+.nav-scrim.show { opacity: 1; pointer-events: auto; }
+
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+    width: min(84vw, 304px); height: 100dvh;
+    flex-direction: column; align-items: stretch; gap: 4px;
+    padding: 16px 14px;
+    transform: translateX(-102%);
+    transition: transform .22s cubic-bezier(.2, .7, .2, 1);
+    box-shadow: var(--shadow-md);
+    overflow-y: auto;
+  }
+  .sidebar.open { transform: none; }
+  .sidebar .brand-row { padding: 4px 6px 14px; }
+  .sidebar .brand-text span { display: inline; }
+  .sidebar .nav-group { display: block; margin-top: 10px; }
+  .sidebar .nav-group > p { display: block; }
+  .sidebar .nav-item { padding: 9px 10px; font-size: 14px; }
+  .sidebar .nav-item.active::before { display: block; }
+  .sidebar .sidebar-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+  .sidebar .user-chip .u-role { display: block; }
+
+  .nav-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; flex: none;
+    border-radius: 10px; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--text-2); cursor: pointer;
+  }
+  .nav-toggle:hover { background: var(--surface-2); color: var(--text); }
+
+  .topbar { padding: 10px 16px; gap: 10px; }
+  .topbar .crumbs { font-size: 12.5px; }
+  .content { padding: 18px 16px 64px; }
+  .page-head { margin-bottom: 18px; }
+  .page-head h1 { font-size: 21px; }
+  .page-head .actions { width: 100%; margin-left: 0; }
+}
+
+@media (max-width: 760px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .stat { padding: 14px; }
+  .stat .value { font-size: 21px; }
+  .stat .spark { display: none; }
+  .panel > .panel-head { padding: 12px 14px; }
+  .panel > .panel-body { padding: 14px; }
+  .content { padding: 16px 12px 60px; }
+  .page-head .actions .btn, .page-head .actions a.btn { flex: 1 1 auto; justify-content: center; }
+
+  /* Toolbars go full width so buttons stop wrapping awkwardly. */
+  .toolbar { gap: 8px; }
+  .toolbar > input, .toolbar > select, .toolbar > .btn, .toolbar > a.btn { flex: 1 1 100%; width: 100%; }
+  .toolbar > .btn, .toolbar > a.btn { justify-content: center; }
+  .search { flex: 1 1 100%; max-width: none; }
+
+  /* Tables become stacked cards; labels come from data-label. */
+  .table-wrap { overflow: visible; }
+  .table.stack { display: block; }
+  .table.stack thead { display: none; }
+  .table.stack tbody, .table.stack tr, .table.stack td { display: block; width: 100%; }
+  .table.stack tr {
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); margin-bottom: 10px; padding: 4px 0;
+    box-shadow: var(--shadow-xs);
+  }
+  .table.stack tbody tr:hover { background: var(--surface); }
+  .table.stack td {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border: 0; padding: 8px 14px; text-align: right;
+  }
+  .table.stack td::before {
+    content: attr(data-label);
+    flex: none; text-align: left;
+    color: var(--text-3); font-size: 12px; font-weight: 560;
+  }
+  .table.stack td.actions { justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+  .table.stack td.actions::before { margin-right: auto; }
+
+  .kv { grid-template-columns: 1fr; gap: 3px 0; }
+  .kv dt { font-size: 12px; }
+  .kv dd { margin-bottom: 9px; }
+
+  .chart { height: 150px; gap: 6px; }
+  .chart-bar > span { display: none; }
+  .plugin-head { flex-wrap: wrap; }
+  .footer-inner { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
+
+@media (max-width: 560px) {
+  .stats { grid-template-columns: 1fr; }
+  .hero { padding: 30px 18px 26px; border-radius: 16px; }
+  .hero h1 { font-size: 27px; }
+  .hero p { font-size: 14px; }
+  .hero-stats { gap: 14px; margin-top: 24px; padding-top: 18px; }
+  .hero-stat .v { font-size: 19px; }
+  .steps { grid-template-columns: 1fr; margin: 20px 0 22px; }
+  .shop-header-inner { gap: 8px; padding: 0 12px; }
+  .shop-nav a { padding: 6px 8px; font-size: 12.5px; }
+  .shop-brand span { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .container { padding: 16px 12px; }
+  /* 16px inputs prevent iOS from zooming on focus. */
+  input[type=text], input[type=email], input[type=password], input[type=number],
+  input[type=search], input[type=date], select, textarea { font-size: 16px; }
+  .segmented { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .segmented::-webkit-scrollbar { height: 0; }
+  .toast { left: 12px; right: 12px; max-width: none; }
+  .keys li { padding: 10px; }
+  .auth-main { padding: 24px 16px; }
+  .auth-card { padding: 24px 20px 20px; }
+}

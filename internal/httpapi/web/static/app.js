@@ -4,6 +4,38 @@
   "use strict";
 
   // Theme toggle: persisted per browser, defaults to light.
+  // Mobile drawer: the sidebar becomes an off-canvas panel below 980px.
+  (function () {
+    var nav = document.getElementById("admin-nav");
+    var toggle = document.querySelector("[data-nav-toggle]");
+    var scrim = document.querySelector("[data-nav-scrim]");
+    if (!nav || !toggle) return;
+
+    function setOpen(open) {
+      nav.classList.toggle("open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      if (scrim) {
+        scrim.hidden = !open;
+        scrim.classList.toggle("show", open);
+      }
+      document.body.style.overflow = open ? "hidden" : "";
+    }
+
+    toggle.addEventListener("click", function () {
+      setOpen(!nav.classList.contains("open"));
+    });
+    if (scrim) scrim.addEventListener("click", function () { setOpen(false); });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") setOpen(false);
+    });
+    nav.addEventListener("click", function (event) {
+      if (event.target.closest("a")) setOpen(false);
+    });
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 980) setOpen(false);
+    });
+  })();
+
   var root = document.documentElement;
   var savedTheme = null;
   try { savedTheme = window.localStorage.getItem("cw-theme"); } catch (e) { /* private mode */ }
