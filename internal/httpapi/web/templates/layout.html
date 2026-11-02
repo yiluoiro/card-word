@@ -55,6 +55,9 @@
     <a class="nav-item {{if hasPrefix .Path "/admin/settings"}}active{{end}}" href="/admin/settings">{{template "i_sliders" .}} 设置</a>
     <a class="nav-item {{if hasPrefix .Path "/admin/tokens"}}active{{end}}" href="/admin/tokens">{{template "i_key" .}} API 令牌</a>
     <a class="nav-item {{if hasPrefix .Path "/admin/audit"}}active{{end}}" href="/admin/audit">{{template "i_shield" .}} 审计日志</a>
+    {{if and .User (eq .User.Role "owner")}}
+    <a class="nav-item {{if hasPrefix .Path "/admin/users"}}active{{end}}" href="/admin/users">{{template "i_users" .}} 团队</a>
+    {{end}}
   </div>
 
   <div class="nav-group quick">
@@ -142,3 +145,4 @@
 {{define "i_download"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>{{end}}
 {{define "i_bolt"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>{{end}}
 {{define "i_eye"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>{{end}}
+{{define "i_users"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{{end}}

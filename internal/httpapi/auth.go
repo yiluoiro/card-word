@@ -333,3 +333,20 @@ func (s *Server) handleLoginTwoFactorSubmit(w http.ResponseWriter, r *http.Reque
 	s.audit(r, "auth.login", user.Username, "second factor verified")
 	redirect(w, r, "/admin")
 }
+
+// staff allows only accounts at or above minRole.
+func (s *Server) staff(minRole string, next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := s.currentUser(r)
+		if user == nil {
+			redirect(w, r, "/admin/login")
+			return
+		}
+		if store.RoleRank(user.Role) < store.RoleRank(minRole) {
+			s.audit(r, "rbac.denied", minRole, r.URL.Path)
+			s.renderError(w, r, http.StatusForbidden, "当前账号没有该操作权限。")
+			return
+		}
+		next(w, r)
+	})
+}

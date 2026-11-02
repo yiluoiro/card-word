@@ -1,0 +1,91 @@
+{{define "admin_users"}}{{template "head" .}}
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
+  {{template "flash" .}}
+  <div class="page-head">
+    <div class="titles">
+      <h1>团队与权限</h1>
+      <div class="sub">所有者可管理账号；管理员可运营；只读账号仅能查看数据</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>新增成员</h3><span class="panel-sub">初始密码至少 12 位，通过安全渠道告知</span></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/users" class="row-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>用户名<input type="text" name="username" required autocomplete="off"></label>
+        <label>初始密码<input type="password" name="password" minlength="12" required autocomplete="new-password"></label>
+        <label>角色
+          <select name="role">
+            <option value="admin">管理员</option>
+            <option value="viewer">只读</option>
+            <option value="owner">所有者</option>
+          </select>
+        </label>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 创建</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>账号</th><th>角色</th><th>状态</th><th>最近登录</th><th class="num">操作</th></tr></thead>
+          <tbody>
+          {{range .Users}}
+            <tr>
+              <td>
+                <div class="primary-cell">{{.Username}}{{if and $.User (eq .ID $.User.ID)}} <span class="badge accent">你</span>{{end}}</div>
+                <div class="secondary-cell">创建于 {{datetime .CreatedAt}}</div>
+              </td>
+              <td>
+                {{if and $.User (eq .ID $.User.ID)}}
+                  <span class="badge">{{.Role}}</span>
+                {{else}}
+                  <form method="post" action="/admin/users/{{.ID}}/role" class="inline">
+                    <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                    <select name="role" style="min-width:110px">
+                      {{$cur := .Role}}
+                      {{range $.Roles}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}
+                    </select>
+                    <button class="btn sm" type="submit">保存</button>
+                  </form>
+                {{end}}
+              </td>
+              <td>
+                {{if .Disabled}}<span class="badge err">已停用</span>{{else}}<span class="badge ok"><span class="dot"></span>正常</span>{{end}}
+                {{if .TOTPEnabled}}<span class="badge info">2FA</span>{{end}}
+              </td>
+              <td class="secondary-cell">{{if .LastLoginAt}}{{datetime .LastLoginAt}}{{else}}—{{end}}</td>
+              <td class="actions">
+                {{if not (and $.User (eq .ID $.User.ID))}}
+                  <form method="post" action="/admin/users/{{.ID}}/disable" class="inline" data-confirm="切换该账号的登录状态？">
+                    <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                    {{if .Disabled}}<input type="hidden" name="enabled" value="1">{{end}}
+                    <input type="hidden" name="disabled" value="{{if not .Disabled}}1{{end}}">
+                    <button class="btn sm" type="submit">{{if .Disabled}}启用{{else}}停用{{end}}</button>
+                  </form>
+                  <form method="post" action="/admin/users/{{.ID}}/delete" class="inline" data-confirm="删除后不可恢复，确认？">
+                    <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                    <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
+                  </form>
+                {{else}}
+                  <span class="muted small">当前登录账号</span>
+                {{end}}
+              </td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+</body>
+</html>{{end}}

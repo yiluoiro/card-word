@@ -173,6 +173,23 @@ func bootstrapAdmin(ctx context.Context, cfg *config.Config, db *store.DB, logge
 		return err
 	}
 	if count > 0 {
+		// Databases created before roles existed only have 'admin' accounts.
+		// Promote the oldest one so the instance always has an owner.
+		if owners, err := db.CountOwners(ctx); err == nil && owners == 0 {
+			if users, err := db.ListUsers(ctx); err == nil && len(users) > 0 {
+				oldest := users[0]
+				for _, u := range users {
+					if u.ID < oldest.ID {
+						oldest = u
+					}
+				}
+				if err := db.SetUserRole(ctx, oldest.ID, store.RoleOwner); err != nil {
+					logger.Warn("failed to promote initial owner", "error", err)
+				} else {
+					logger.Info("promoted oldest account to owner", "username", oldest.Username)
+				}
+			}
+		}
 		return nil
 	}
 	password := cfg.AdminPassword
@@ -184,7 +201,7 @@ func bootstrapAdmin(ctx context.Context, cfg *config.Config, db *store.DB, logge
 		}
 		generated = true
 	}
-	user, err := db.CreateUser(ctx, cfg.AdminUser, password, "admin")
+	user, err := db.CreateUser(ctx, cfg.AdminUser, password, store.RoleOwner)
 	if err != nil {
 		return fmt.Errorf("create bootstrap admin: %w", err)
 	}
