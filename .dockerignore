@@ -1,0 +1,9 @@
+.git
+.github
+data
+tmpdata
+*.exe
+*.log
+keys
+*.sig
+.env

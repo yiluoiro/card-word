@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l ./cmd ./internal)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (race enabled)
+        run: go test ./... -race -count=1
+
+      - name: Build binaries
+        run: |
+          CGO_ENABLED=0 go build -trimpath -o /tmp/cardword ./cmd/cardword
+          CGO_ENABLED=0 go build -trimpath -o /tmp/cardword-sign ./cmd/cardword-sign
+
+      - name: Smoke test the binary
+        run: |
+          CARDWORD_ADMIN_PASSWORD='ci-password-123456' \
+          /tmp/cardword --addr 127.0.0.1:18080 --data /tmp/cwdata --env development \
+            --base-url http://127.0.0.1:18080 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/readyz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/healthz
+          curl -fsS http://127.0.0.1:18080/ | grep -q "Card Word"
+          kill %1

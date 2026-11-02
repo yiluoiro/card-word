@@ -1,0 +1,28 @@
+{
+  "schema": "cardword.plugin/v1",
+  "uid": "com.example.hello-theme",
+  "name": "Hello Theme",
+  "version": "1.0.0",
+  "author": "card word contributors",
+  "description": "最小静态插件示例：提供一个说明页面，演示 static 运行时、权限声明与打包签名流程。",
+  "homepage": "https://github.com/yiluoiro/card-word",
+  "kind": "theme",
+  "license": "Apache-2.0",
+  "runtime": {
+    "type": "static"
+  },
+  "static": {
+    "index": "index.html"
+  },
+  "permissions": ["theme.override"],
+  "hooks": [],
+  "settings": [
+    {
+      "key": "accent",
+      "label": "强调色",
+      "type": "text",
+      "default": "#4f46e5",
+      "description": "示例配置项，仅用于演示后台配置表单"
+    }
+  ]
+}

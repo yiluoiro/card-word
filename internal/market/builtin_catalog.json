@@ -1,0 +1,45 @@
+{
+  "schema": "cardword.market/v1",
+  "updated": "2026-11-02",
+  "plugins": [
+    {
+      "uid": "com.cardword.epay",
+      "name": "EPay 聚合支付",
+      "version": "1.0.0",
+      "author": "card word",
+      "kind": "payment",
+      "description": "接入彩虹易支付系列网关（支付宝/微信/QQ），支持 MD5 签名回调校验。内置驱动已实现同一协议，可作为自建插件的参考实现。",
+      "homepage": "https://github.com/",
+      "download_url": "",
+      "sha256": "",
+      "signature": "",
+      "tags": ["payment", "epay"]
+    },
+    {
+      "uid": "com.cardword.webhook-notifier",
+      "name": "Webhook 通知",
+      "version": "1.0.0",
+      "author": "card word",
+      "kind": "notifier",
+      "description": "通过 HTTPS Webhook 把下单、支付、发货事件推送到企业微信/钉钉/自建服务，全部使用 HMAC-SHA256 签名。",
+      "homepage": "https://github.com/",
+      "download_url": "",
+      "sha256": "",
+      "signature": "",
+      "tags": ["notify", "webhook"]
+    },
+    {
+      "uid": "com.cardword.neon-theme",
+      "name": "Neon 店面主题",
+      "version": "1.0.0",
+      "author": "card word",
+      "kind": "theme",
+      "description": "静态运行时主题插件示例：只包含 CSS/HTML 资源，无需任何后端进程，安装后通过 /assets/plugins/<uid>/ 提供。",
+      "homepage": "https://github.com/",
+      "download_url": "",
+      "sha256": "",
+      "signature": "",
+      "tags": ["theme", "static"]
+    }
+  ]
+}

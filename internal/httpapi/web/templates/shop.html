@@ -1,0 +1,225 @@
+{{define "home"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container">
+  {{if .Site.Notice}}<div class="alert info">{{.Site.Notice}}</div>{{end}}
+  {{if .Site.Maintenance}}<div class="alert warn">站点维护中，部分功能可能不可用。</div>{{end}}
+  <section class="hero">
+    <h1>{{.Site.Name}}</h1>
+    <p>{{.Site.Tagline}}</p>
+  </section>
+
+  {{if .Categories}}
+  <div class="chips">
+    {{range .Categories}}<span class="chip">{{.Name}}</span>{{end}}
+  </div>
+  {{end}}
+
+  {{if .Products}}
+  <div class="grid">
+    {{range .Products}}
+    <a class="card product" href="/p/{{.Slug}}">
+      <div class="card-head">
+        <h3>{{.Name}}</h3>
+        {{if gt .Stock 0}}<span class="badge ok">库存 {{.Stock}}</span>{{else}}<span class="badge muted">缺货</span>{{end}}
+      </div>
+      <p class="muted small">{{if .Summary}}{{.Summary}}{{else}}&nbsp;{{end}}</p>
+      <div class="card-foot">
+        <strong class="price">{{money .PriceCents .Currency}}</strong>
+        <span class="btn sm">购买</span>
+      </div>
+    </a>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="empty">暂无在售商品。</div>
+  {{end}}
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "product"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container narrow">
+  {{template "flash" .}}
+  <a class="back" href="/">← 返回商品列表</a>
+  <div class="card">
+    <div class="card-head">
+      <h2>{{.Product.Name}}</h2>
+      {{if gt .Product.Stock 0}}<span class="badge ok">库存 {{.Product.Stock}}</span>{{else}}<span class="badge muted">缺货</span>{{end}}
+    </div>
+    <p class="price-lg">{{money .Product.PriceCents .Product.Currency}}</p>
+    {{if .Product.Summary}}<p class="muted">{{.Product.Summary}}</p>{{end}}
+
+    <form method="post" action="/checkout" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="product_id" value="{{.Product.ID}}">
+      <input type="hidden" name="idem" value="{{.CSRF}}{{.Product.ID}}">
+
+      <label>购买数量
+        <input type="number" name="quantity" value="{{.Product.MinQty}}" min="{{.Product.MinQty}}" max="{{.Product.MaxQty}}" required>
+      </label>
+      <label>接收卡密的邮箱（可选）
+        <input type="email" name="email" placeholder="you@example.com" autocomplete="email">
+      </label>
+      <label>联系方式（可选）
+        <input type="text" name="contact" placeholder="QQ / TG / 微信" autocomplete="off">
+      </label>
+      <label>优惠码（可选）
+        <input type="text" name="coupon" placeholder="SAVE10" autocomplete="off">
+      </label>
+      <label>支付方式
+        <select name="driver">
+          {{range .Drivers}}<option value="{{.Name}}">{{.Title}}</option>{{end}}
+        </select>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="agree" value="1" required>
+        <span>我已阅读并同意：虚拟商品一经售出，非卡密问题不支持退款。</span>
+      </label>
+      <button class="btn primary block" type="submit" {{if eq .Product.Stock 0}}disabled{{end}}>提交订单</button>
+    </form>
+
+    {{if .Product.Description}}
+    <div class="prose">{{.Product.Description}}</div>
+    {{end}}
+  </div>
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "order"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container narrow">
+  {{template "flash" .}}
+  <div class="card">
+    <div class="card-head">
+      <h2>订单 {{.Order.OrderNo}}</h2>
+      <span class="badge {{statusClass .Order.Status}}">{{statusText .Order.Status}}</span>
+    </div>
+    <dl class="kv">
+      <dt>商品</dt><dd>{{.Order.ProductName}} × {{.Order.Quantity}}</dd>
+      <dt>金额</dt><dd>{{money .Order.TotalCents .Order.Currency}}{{if gt .Order.DiscountCents 0}} <span class="muted small">(已优惠 {{money .Order.DiscountCents .Order.Currency}})</span>{{end}}</dd>
+      <dt>状态</dt><dd>{{statusText .Order.Status}}</dd>
+      <dt>创建时间</dt><dd>{{datetime .Order.CreatedAt}}</dd>
+      <dt>支付截止</dt><dd>{{datetime .Order.ExpiresAt}}</dd>
+      {{if .Order.PaidAt}}<dt>支付时间</dt><dd>{{datetime .Order.PaidAt}}</dd>{{end}}
+      <dt>查询凭证</dt><dd class="mono">{{.Token}}</dd>
+    </dl>
+
+    {{if eq .Order.Status "pending"}}
+      <a class="btn primary block" href="/order/{{.Order.OrderNo}}/pay?token={{.Token}}">去支付</a>
+      <p class="muted small center" data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}">正在等待支付结果…</p>
+    {{end}}
+
+    {{if .Cards}}
+    <div class="deliver">
+      <h3>卡密（{{len .Cards}}）</h3>
+      <ul class="keys" id="keys">
+        {{range .Cards}}<li><code>{{.Secret}}</code></li>{{end}}
+      </ul>
+      <button class="btn sm" type="button" data-copy-all="#keys">复制全部</button>
+      <p class="muted small">请立即保存，本页面链接即凭证，泄露可能导致卡密被他人取走。</p>
+    </div>
+    {{end}}
+  </div>
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "pay"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container narrow">
+  <div class="card center">
+    <h2>正在跳转支付</h2>
+    <p class="muted">订单 {{.Order.OrderNo}} · {{money .Order.TotalCents .Order.Currency}}</p>
+    {{if eq .Action.Kind "form"}}
+      <form id="payform" method="post" action="{{.Action.URL}}" data-autosubmit>
+        {{range $k, $v := .Action.Fields}}<input type="hidden" name="{{$k}}" value="{{$v}}">{{end}}
+        <button class="btn primary" type="submit">继续支付</button>
+      </form>
+    {{else if eq .Action.Kind "redirect"}}
+      <p data-redirect="{{.Action.URL}}">若未自动跳转，请<a href="{{.Action.URL}}" rel="noopener">点击这里</a>。</p>
+    {{else}}
+      <pre class="inline-msg">{{.Action.Message}}</pre>
+      <p class="muted">完成付款后请联系站长确认，订单状态会自动更新。</p>
+      <p data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}">等待确认中…</p>
+    {{end}}
+    <p><a class="back" href="/order/{{.Order.OrderNo}}?token={{.Token}}">返回订单</a></p>
+  </div>
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "pay_pending"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container narrow">
+  <div class="card center">
+    <h2>支付结果确认中</h2>
+    <p class="muted">订单 {{.Order.OrderNo}}</p>
+    <p>支付平台回调可能有数秒延迟，请稍后使用订单号与查询凭证查看结果。</p>
+    <a class="btn primary" href="/query">前往订单查询</a>
+  </div>
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "query"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container narrow">
+  {{template "flash" .}}
+  <div class="card">
+    <h2>订单查询</h2>
+    <p class="muted">输入订单号与下单时获得的查询凭证。</p>
+    <form method="post" action="/query" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>订单号<input type="text" name="order_no" placeholder="CW20261102-XXXXXX" required></label>
+      <label>查询凭证<input type="text" name="token" placeholder="下单后显示的凭证" required></label>
+      <button class="btn primary block" type="submit">查询</button>
+    </form>
+  </div>
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "error"}}{{template "head" .}}
+<body class="shop">
+{{template "shop_nav" .}}
+<main class="container narrow">
+  <div class="card center">
+    <h2 class="err-code">{{.Status}}</h2>
+    <p>{{.Message}}</p>
+    <p><a class="btn" href="/">返回首页</a></p>
+  </div>
+</main>
+{{template "footer" .}}
+</body>
+</html>{{end}}
+
+{{define "admin_login"}}{{template "head" .}}
+<body class="auth">
+<main class="auth-card">
+  <h1>{{.Site.Name}}</h1>
+  <p class="muted">管理员登录</p>
+  {{if .Error}}<div class="alert err">{{.Error}}</div>{{end}}
+  <form method="post" action="/admin/login" class="form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label>用户名<input type="text" name="username" autocomplete="username" required autofocus></label>
+    <label>密码<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn primary block" type="submit">登录</button>
+  </form>
+  <p class="muted small center">受审计保护：所有管理操作都会记录来源 IP。</p>
+</main>
+</body>
+</html>{{end}}

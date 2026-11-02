@@ -1,0 +1,27 @@
+# 运行时数据（数据库、主密钥、插件、日志）
+/data/
+/tmpdata/
+*.db
+*.db-shm
+*.db-wal
+master.key
+initial-admin.txt
+
+# 构建产物
+/cardword
+/cardword.exe
+/cardword-sign
+/cardword-sign.exe
+/dist/
+
+# 签名密钥与包
+keys/
+*.sig
+
+# 本地环境
+.env
+.env.local
+.DS_Store
+coverage.out
+*.test
+tmpkeys/

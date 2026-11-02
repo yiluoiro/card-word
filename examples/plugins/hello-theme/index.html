@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hello Theme · card word 插件示例</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>Hello Theme</h1>
+    <p class="lead">这是一个 <strong>static</strong> 运行时插件示例：没有后端进程，只由核心的 <code>/assets/plugins/&lt;uid&gt;/</code> 提供文件。</p>
+
+    <section>
+      <h2>它演示了什么</h2>
+      <ul>
+        <li><code>manifest.json</code> 的最小合法结构（schema / uid / version / kind）</li>
+        <li><code>runtime.type = "static"</code> 与 <code>static.index</code></li>
+        <li>权限白名单：只声明 <code>theme.override</code></li>
+        <li>可在后台渲染的 <code>settings</code> 配置字段</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>打包与安装</h2>
+      <pre><code>zip -r hello-theme.zip manifest.json index.html theme.css
+go run ./cmd/cardword-sign keygen --out ./keys
+go run ./cmd/cardword-sign sign --key ./keys/ed25519.key --in hello-theme.zip</code></pre>
+      <p>然后在后台「应用商城 → 上传安装」提交 ZIP 与签名，核对权限后启用。</p>
+    </section>
+
+    <p class="muted">想接入真实业务？把 <code>runtime.type</code> 改成 <code>external</code>，声明 <code>http.outbound</code>，然后按 <code>docs/PLUGIN_SDK.md</code> 暴露 <code>/payment/create</code>、<code>/hook</code> 与 <code>/healthz</code>。</p>
+  </main>
+</body>
+</html>

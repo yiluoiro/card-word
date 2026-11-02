@@ -1,0 +1,61 @@
+{{define "head"}}<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{if .Title}}{{.Title}} · {{end}}{{.Site.Name}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>{{end}}
+
+{{define "shop_nav"}}
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="/">{{.Site.Name}}</a>
+    <nav class="nav">
+      <a href="/">商品</a>
+      <a href="/query">订单查询</a>
+      {{if .User}}<a href="/admin">控制台</a>{{else}}<a href="/admin/login">管理</a>{{end}}
+    </nav>
+  </div>
+</header>
+{{end}}
+
+{{define "admin_nav"}}
+<header class="topbar admin">
+  <div class="container topbar-inner">
+    <a class="brand" href="/admin">{{.Site.Name}} <span class="badge">后台</span></a>
+    <nav class="nav">
+      <a href="/admin" class="{{if eq .Path "/admin"}}active{{end}}">概览</a>
+      <a href="/admin/products" class="{{if hasPrefix .Path "/admin/products"}}active{{end}}">商品</a>
+      <a href="/admin/categories" class="{{if hasPrefix .Path "/admin/categories"}}active{{end}}">分类</a>
+      <a href="/admin/orders" class="{{if hasPrefix .Path "/admin/orders"}}active{{end}}">订单</a>
+      <a href="/admin/coupons" class="{{if hasPrefix .Path "/admin/coupons"}}active{{end}}">优惠码</a>
+      <a href="/admin/plugins" class="{{if hasPrefix .Path "/admin/plugins"}}active{{end}}">应用商城</a>
+      <a href="/admin/settings" class="{{if hasPrefix .Path "/admin/settings"}}active{{end}}">设置</a>
+      <a href="/admin/tokens" class="{{if hasPrefix .Path "/admin/tokens"}}active{{end}}">令牌</a>
+      <a href="/admin/audit" class="{{if hasPrefix .Path "/admin/audit"}}active{{end}}">审计</a>
+      <a href="/" target="_blank" rel="noopener">前台</a>
+    </nav>
+    <form method="post" action="/admin/logout" class="inline">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button class="btn ghost sm" type="submit">退出</button>
+    </form>
+  </div>
+</header>
+{{end}}
+
+{{define "flash"}}
+{{if .Flash}}<div class="alert ok">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="alert err">{{.Error}}</div>{{end}}
+{{end}}
+
+{{define "footer"}}
+<footer class="footer">
+  <div class="container">
+    <p>{{.Site.Name}} · 基于 <a href="https://github.com/" rel="noopener">card word</a> v{{version}} · Apache-2.0</p>
+    {{if .Site.Contact}}<p>联系：{{.Site.Contact}}</p>{{end}}
+  </div>
+</footer>
+{{end}}

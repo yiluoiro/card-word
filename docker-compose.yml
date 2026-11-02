@@ -1,0 +1,35 @@
+services:
+  cardword:
+    build:
+      context: .
+      args:
+        VERSION: "0.1.0"
+    image: cardword:0.1.0
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # 必须改成你的公网地址，支付回调与同源校验都依赖它
+      CARDWORD_BASE_URL: "http://127.0.0.1:8080"
+      CARDWORD_ENV: "production"
+      CARDWORD_LOG_LEVEL: "info"
+      # 首次启动用于创建管理员，登录后请立即在后台修改并删除该变量
+      CARDWORD_ADMIN_PASSWORD: "ChangeMe-please-123"
+      # 可选：显式指定主密钥（base64/hex 32 字节），不设置则自动生成到 /data/master.key
+      # CARDWORD_MASTER_KEY: ""
+      # 可选：强制插件签名并信任公钥
+      # CARDWORD_PLUGIN_REQUIRE_SIGNATURE: "1"
+      # CARDWORD_PLUGIN_PUBLIC_KEYS: "base64-public-key"
+      # 可选：远程商城索引
+      # CARDWORD_MARKET_URL: "https://example.com/cardword/market.json"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
