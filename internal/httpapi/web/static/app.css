@@ -521,6 +521,9 @@ select { appearance: none; background-image: url("data:image/svg+xml;charset=utf
 .checklist svg { color: var(--ok); margin-top: 2px; flex: none; }
 .checklist li:last-child svg { color: var(--warn); }
 
+.pager { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.pager .btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
+
 /* ---------- footer ---------- */
 
 .footer { border-top: 1px solid var(--border); background: var(--surface); padding: 20px 0; margin-top: auto; }

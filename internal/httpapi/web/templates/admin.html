@@ -320,6 +320,7 @@
     <button class="btn sm" type="submit">{{template "i_search" .}} 筛选</button>
     <a class="btn sm" href="/admin/orders/export.csv?status={{.Status}}&q={{.Search}}">{{template "i_download" .}} 导出 CSV</a>
   </form>
+  {{template "pager" .}}
 
   <div class="panel">
     <div class="panel-body flush">

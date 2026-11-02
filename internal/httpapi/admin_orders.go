@@ -18,16 +18,47 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	search := strings.TrimSpace(r.URL.Query().Get("q"))
-	orders, err := s.db.ListOrders(ctx, store.OrderFilter{Status: status, Search: search, Limit: 200})
+	const pageSize = 50
+	page := int(parseInt64(r.URL.Query().Get("page")))
+	if page < 1 {
+		page = 1
+	}
+	filter := store.OrderFilter{Status: status, Search: search}
+	total, err := s.db.CountOrders(ctx, filter)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "加载订单失败。")
 		return
 	}
+	pages := (total + pageSize - 1) / pageSize
+	if pages < 1 {
+		pages = 1
+	}
+	if page > pages {
+		page = pages
+	}
+	filter.Limit = pageSize
+	filter.Offset = (page - 1) * pageSize
+	orders, err := s.db.ListOrders(ctx, filter)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "加载订单失败。")
+		return
+	}
+	queryBase := ""
+	if status != "" {
+		queryBase += "status=" + urlEscape(status) + "&"
+	}
+	if search != "" {
+		queryBase += "q=" + urlEscape(search) + "&"
+	}
 	s.render(w, r, "admin_orders", map[string]any{
-		"Title":  "订单管理",
-		"Orders": orders,
-		"Status": status,
-		"Search": search,
+		"Title":      "订单管理",
+		"Orders":     orders,
+		"Status":     status,
+		"Search":     search,
+		"Page":       page,
+		"TotalPages": pages,
+		"Total":      total,
+		"QueryBase":  queryBase,
 	})
 }
 

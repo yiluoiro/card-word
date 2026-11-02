@@ -286,15 +286,40 @@ func (s *Server) handleAdminSettingsSave(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
 	action := strings.TrimSpace(r.URL.Query().Get("action"))
-	entries, err := s.db.ListAudit(r.Context(), action, 200, 0)
+	const pageSize = 100
+	page := int(parseInt64(r.URL.Query().Get("page")))
+	if page < 1 {
+		page = 1
+	}
+	total, err := s.db.CountAudit(r.Context(), action)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "加载审计日志失败。")
 		return
 	}
+	pages := (total + pageSize - 1) / pageSize
+	if pages < 1 {
+		pages = 1
+	}
+	if page > pages {
+		page = pages
+	}
+	entries, err := s.db.ListAudit(r.Context(), action, pageSize, (page-1)*pageSize)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "加载审计日志失败。")
+		return
+	}
+	queryBase := ""
+	if action != "" {
+		queryBase = "action=" + urlEscape(action) + "&"
+	}
 	s.render(w, r, "admin_audit", map[string]any{
-		"Title":   "审计日志",
-		"Entries": entries,
-		"Action":  action,
+		"Title":      "审计日志",
+		"Entries":    entries,
+		"Action":     action,
+		"Page":       page,
+		"TotalPages": pages,
+		"Total":      total,
+		"QueryBase":  queryBase,
 	})
 }
 

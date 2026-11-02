@@ -68,3 +68,16 @@ func truncate(s string, max int) string {
 }
 
 func utf8Boundary(b byte) bool { return b&0xC0 != 0x80 }
+
+// CountAudit returns the number of audit rows matching an action prefix.
+func (d *DB) CountAudit(ctx context.Context, action string) (int, error) {
+	q := `SELECT COUNT(*) FROM audit_logs`
+	var args []any
+	if action != "" {
+		q += ` WHERE action LIKE ?`
+		args = append(args, action+"%")
+	}
+	var n int
+	err := d.read.QueryRowContext(ctx, q, args...).Scan(&n)
+	return n, wrapErr("count audit", err)
+}
