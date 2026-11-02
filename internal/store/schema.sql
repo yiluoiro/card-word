@@ -169,7 +169,9 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     scopes       TEXT    NOT NULL DEFAULT '',
     created_at   INTEGER NOT NULL,
     last_used_at INTEGER,
-    revoked_at   INTEGER
+    revoked_at   INTEGER,
+    expires_at   INTEGER,
+    allowed_ips  TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS plugins (

@@ -338,7 +338,7 @@ func TestAPITokensAndScopes(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	token, plain, err := h.db.CreateAPIToken(ctx, "test", []string{"products:read"})
+	token, plain, err := h.db.CreateAPIToken(ctx, store.TokenInput{Name: "test", Scopes: []string{"products:read"}})
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}

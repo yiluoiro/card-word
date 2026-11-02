@@ -19,11 +19,21 @@ type APIToken struct {
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
 	RevokedAt  *time.Time
+	ExpiresAt  *time.Time
+	AllowedIPs []string
+}
+
+// TokenInput describes a new API credential.
+type TokenInput struct {
+	Name       string
+	Scopes     []string
+	ExpiresAt  *time.Time
+	AllowedIPs []string
 }
 
 // CreateAPIToken issues a token and returns its plaintext exactly once.
-func (d *DB) CreateAPIToken(ctx context.Context, name string, scopes []string) (*APIToken, string, error) {
-	name = strings.TrimSpace(name)
+func (d *DB) CreateAPIToken(ctx context.Context, in TokenInput) (*APIToken, string, error) {
+	name := strings.TrimSpace(in.Name)
 	if name == "" {
 		return nil, "", errors.New("store: token name required")
 	}
@@ -34,35 +44,49 @@ func (d *DB) CreateAPIToken(ctx context.Context, name string, scopes []string) (
 	plain := "cwk_" + secret
 	prefix := plain[:12]
 	now := nowUnix()
+	var expires any
+	if in.ExpiresAt != nil {
+		expires = in.ExpiresAt.Unix()
+	}
 	res, err := d.write.ExecContext(ctx,
-		`INSERT INTO api_tokens (name, prefix, token_hash, scopes, created_at) VALUES (?, ?, ?, ?, ?)`,
-		name, prefix, cryptoutil.TokenHash(plain), strings.Join(scopes, ","), now)
+		`INSERT INTO api_tokens (name, prefix, token_hash, scopes, created_at, expires_at, allowed_ips)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		name, prefix, cryptoutil.TokenHash(plain), strings.Join(in.Scopes, ","), now, expires,
+		strings.Join(in.AllowedIPs, ","))
 	if err != nil {
 		return nil, "", wrapErr("create api token", err)
 	}
 	id, _ := res.LastInsertId()
-	return &APIToken{ID: id, Name: name, Prefix: prefix, Scopes: scopes, CreatedAt: unixToTime(now)}, plain, nil
+	return &APIToken{
+		ID: id, Name: name, Prefix: prefix, Scopes: in.Scopes,
+		CreatedAt: unixToTime(now), ExpiresAt: in.ExpiresAt, AllowedIPs: in.AllowedIPs,
+	}, plain, nil
 }
 
 // APITokenByPlain resolves a plaintext token and returns it with its scopes.
 func (d *DB) APITokenByPlain(ctx context.Context, plain string) (*APIToken, error) {
 	var t APIToken
-	var scopes string
+	var scopes, allowedIPs string
 	var created int64
-	var lastUsed, revoked sql.NullInt64
+	var lastUsed, revoked, expires sql.NullInt64
 	err := d.read.QueryRowContext(ctx,
-		`SELECT id, name, prefix, scopes, created_at, last_used_at, revoked_at
+		`SELECT id, name, prefix, scopes, created_at, last_used_at, revoked_at, expires_at, allowed_ips
 		 FROM api_tokens WHERE token_hash = ?`, cryptoutil.TokenHash(strings.TrimSpace(plain))).
-		Scan(&t.ID, &t.Name, &t.Prefix, &scopes, &created, &lastUsed, &revoked)
+		Scan(&t.ID, &t.Name, &t.Prefix, &scopes, &created, &lastUsed, &revoked, &expires, &allowedIPs)
 	if err != nil {
 		return nil, wrapErr("get api token", err)
 	}
 	if revoked.Valid {
 		return nil, ErrNotFound
 	}
+	if expires.Valid && time.Now().UTC().After(unixToTime(expires.Int64)) {
+		return nil, ErrNotFound
+	}
 	t.Scopes = splitScopes(scopes)
+	t.AllowedIPs = splitScopes(allowedIPs)
 	t.CreatedAt = unixToTime(created)
 	t.LastUsedAt = nullTime(lastUsed)
+	t.ExpiresAt = nullTime(expires)
 	return &t, nil
 }
 
@@ -89,7 +113,8 @@ func (d *DB) TouchAPIToken(ctx context.Context, id int64) error {
 // ListAPITokens lists tokens without secrets.
 func (d *DB) ListAPITokens(ctx context.Context) ([]APIToken, error) {
 	rows, err := d.read.QueryContext(ctx,
-		`SELECT id, name, prefix, scopes, created_at, last_used_at, revoked_at FROM api_tokens ORDER BY id DESC`)
+		`SELECT id, name, prefix, scopes, created_at, last_used_at, revoked_at, expires_at, allowed_ips
+		 FROM api_tokens ORDER BY id DESC`)
 	if err != nil {
 		return nil, wrapErr("list api tokens", err)
 	}
@@ -97,16 +122,18 @@ func (d *DB) ListAPITokens(ctx context.Context) ([]APIToken, error) {
 	var out []APIToken
 	for rows.Next() {
 		var t APIToken
-		var scopes string
+		var scopes, allowedIPs string
 		var created int64
-		var lastUsed, revoked sql.NullInt64
-		if err := rows.Scan(&t.ID, &t.Name, &t.Prefix, &scopes, &created, &lastUsed, &revoked); err != nil {
+		var lastUsed, revoked, expires sql.NullInt64
+		if err := rows.Scan(&t.ID, &t.Name, &t.Prefix, &scopes, &created, &lastUsed, &revoked, &expires, &allowedIPs); err != nil {
 			return nil, wrapErr("scan api token", err)
 		}
 		t.Scopes = splitScopes(scopes)
+		t.AllowedIPs = splitScopes(allowedIPs)
 		t.CreatedAt = unixToTime(created)
 		t.LastUsedAt = nullTime(lastUsed)
 		t.RevokedAt = nullTime(revoked)
+		t.ExpiresAt = nullTime(expires)
 		out = append(out, t)
 	}
 	return out, wrapErr("list api tokens", rows.Err())

@@ -138,6 +138,15 @@ func (d *DB) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	// API token hardening columns.
+	for _, col := range []struct{ name, ddl string }{
+		{"expires_at", "expires_at INTEGER"},
+		{"allowed_ips", "allowed_ips TEXT NOT NULL DEFAULT ''"},
+	} {
+		if err := d.ensureColumn(ctx, "api_tokens", col.name, col.ddl); err != nil {
+			return err
+		}
+	}
 	if _, err := d.write.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
 		return fmt.Errorf("store: set user_version: %w", err)
 	}

@@ -123,3 +123,31 @@ X-API-Key: cwk_xxxxxxxx...
 | `internal` | 500 | 服务端错误（详情只进日志，含请求 ID） |
 
 所有响应带 `X-Request-Id`，排查时用它检索日志。
+
+## 7. 机器对接增强
+
+### GET /api/v1/categories
+作用域 `products:read`，返回前台可见分类（`id` / `name` / `slug` / `sort`），用于机器人同步目录。
+
+### 商品筛选与分页
+`GET /api/v1/products?q=<关键词>&category=<slug>&limit=1..200&offset=<n>`
+响应附带 `meta.limit / meta.offset / meta.count`。分类不存在返回 404。
+
+### 安全重试
+`POST /api/v1/orders` 支持 `Idempotency-Key` 请求头：相同键重复提交返回同一订单，不会重复占用库存；未提供时回退为请求体哈希。
+
+### 令牌策略
+- **有效期**：创建时填写天数，过期后立即失效（不再能通过校验）
+- **来源 IP 白名单**：单 IP 或 CIDR，逗号分隔；命中失败返回 403
+- **按令牌限流**：默认 30 req/s、突发 120，与全局 IP 限流独立
+- **作用域**：`products:read`、`orders:read`、`orders:write`、`cards:write`、`cards:read`
+
+### 错误码补充
+- `403 forbidden`：作用域不足、来源 IP 不在白名单、CSRF/来源校验失败
+- `429 rate_limited`：令牌限流触发
+
+### 机器人最小对接流程
+1. `GET /api/v1/categories` 拉分类
+2. `GET /api/v1/products?category=<slug>` 拉商品与库存
+3. `POST /api/v1/orders`（带 `Idempotency-Key`）创建订单，拿到 `pay_url` 与 `query_token`
+4. `GET /api/v1/orders/{no}` 轮询状态；仅当令牌含 `cards:read` 时返回明文卡密

@@ -45,7 +45,8 @@ type Server struct {
 	dummyMu     sync.Mutex
 	cachedDummy string
 
-	guard *loginGuard
+	guard      *loginGuard
+	apiLimiter *rateLimiter
 }
 
 // Deps bundles the collaborators passed to New.
@@ -90,6 +91,9 @@ func New(d Deps) (*Server, error) {
 	}
 	s.limiter = newRateLimiter(d.Config.RateLimitRPS, d.Config.RateLimitBurst)
 	s.authLimit = newRateLimiter(0.2, 8) // ~12 login attempts per minute
+	// Machine clients get their own budget keyed by token id, so one noisy
+	// integration cannot exhaust the shared IP bucket.
+	s.apiLimiter = newRateLimiter(30, 120)
 	if err := s.reloadSettings(context.Background()); err != nil {
 		return nil, err
 	}
@@ -138,6 +142,7 @@ func (s *Server) routes() {
 
 	// Machine API.
 	s.mux.HandleFunc("GET /api/v1/ping", s.handleAPIPing)
+	s.mux.HandleFunc("GET /api/v1/categories", s.handleAPICategories)
 	s.mux.HandleFunc("GET /api/v1/products", s.handleAPIProducts)
 	s.mux.HandleFunc("GET /api/v1/products/{slug}", s.handleAPIProduct)
 	s.mux.HandleFunc("GET /api/v1/orders/{no}", s.handleAPIOrder)

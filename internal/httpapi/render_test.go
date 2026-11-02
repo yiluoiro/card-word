@@ -29,7 +29,7 @@ func TestAdminPagesRender(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create coupon: %v", err)
 	}
-	if _, _, err := h.db.CreateAPIToken(ctx, "render", []string{"products:read"}); err != nil {
+	if _, _, err := h.db.CreateAPIToken(ctx, store.TokenInput{Name: "render", Scopes: []string{"products:read"}}); err != nil {
 		t.Fatalf("create token: %v", err)
 	}
 

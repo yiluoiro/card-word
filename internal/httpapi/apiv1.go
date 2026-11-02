@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,8 +34,42 @@ func (s *Server) requireAPIToken(w http.ResponseWriter, r *http.Request, scope s
 		writeAPIError(w, http.StatusForbidden, "forbidden", "token lacks scope "+scope)
 		return nil, false
 	}
+	// Optional source address allow-list (single IP or CIDR).
+	if len(record.AllowedIPs) > 0 && !ipAllowed(s.clientIP(r), record.AllowedIPs) {
+		writeAPIError(w, http.StatusForbidden, "forbidden", "token is not allowed from this address")
+		return nil, false
+	}
+	// Per-token budget so one integration cannot starve the others.
+	if !s.apiLimiter.allow("token:" + strconv.FormatInt(record.ID, 10)) {
+		writeAPIError(w, http.StatusTooManyRequests, "rate_limited", "token rate limit exceeded")
+		return nil, false
+	}
 	_ = s.db.TouchAPIToken(r.Context(), record.ID)
 	return record, true
+}
+
+// ipAllowed matches an address against exact IPs or CIDR ranges.
+func ipAllowed(addr string, allow []string) bool {
+	parsed := net.ParseIP(strings.TrimSpace(addr))
+	if parsed == nil {
+		return false
+	}
+	for _, entry := range allow {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if strings.Contains(entry, "/") {
+			if _, network, err := net.ParseCIDR(entry); err == nil && network.Contains(parsed) {
+				return true
+			}
+			continue
+		}
+		if ip := net.ParseIP(entry); ip != nil && ip.Equal(parsed) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasScope(scopes []string, want string) bool {
@@ -57,7 +92,23 @@ func (s *Server) handleAPIProducts(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAPIToken(w, r, "products:read"); !ok {
 		return
 	}
-	products, err := s.db.ListProducts(r.Context(), store.ProductFilter{Status: store.ProductActive, Limit: 200})
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	category := strings.TrimSpace(r.URL.Query().Get("category"))
+	limit := int(parseInt64(r.URL.Query().Get("limit")))
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	offset := int(parseInt64(r.URL.Query().Get("offset")))
+	filter := store.ProductFilter{Status: store.ProductActive, Search: q, Limit: limit, Offset: offset}
+	if category != "" {
+		c, err := s.db.CategoryBySlug(r.Context(), category)
+		if err != nil {
+			writeAPIError(w, http.StatusNotFound, "not_found", "category not found")
+			return
+		}
+		filter.CategoryID = c.ID
+	}
+	products, err := s.db.ListProducts(r.Context(), filter)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "internal", "cannot list products")
 		return
@@ -65,6 +116,32 @@ func (s *Server) handleAPIProducts(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(products))
 	for _, p := range products {
 		out = append(out, productJSON(p))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":   true,
+		"data": out,
+		"meta": map[string]any{"limit": limit, "offset": offset, "count": len(out)},
+	})
+}
+
+// handleAPICategories lists visible categories for catalogue sync.
+func (s *Server) handleAPICategories(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAPIToken(w, r, "products:read"); !ok {
+		return
+	}
+	categories, err := s.db.ListCategories(r.Context(), true)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "internal", "cannot list categories")
+		return
+	}
+	out := make([]map[string]any, 0, len(categories))
+	for _, c := range categories {
+		out = append(out, map[string]any{
+			"id":   c.ID,
+			"name": c.Name,
+			"slug": c.Slug,
+			"sort": c.Sort,
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": out})
 }
@@ -197,7 +274,7 @@ func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
 		CouponCode:     strings.TrimSpace(req.Coupon),
 		PaymentDriver:  req.Driver,
 		ClientIP:       s.clientIP(r),
-		IdempotencyKey: "api:" + cryptoutil.TokenHash(string(body))[:24],
+		IdempotencyKey: apiIdempotencyKey(r, body),
 		TTL:            s.cfg.OrderTTL,
 	})
 	if err != nil {
@@ -309,4 +386,13 @@ func (s *Server) handlePluginNotify(w http.ResponseWriter, r *http.Request) {
 	}
 	s.completePayment(r.Context(), cb, s.clientIP(r))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// apiIdempotencyKey prefers an explicit Idempotency-Key header so a robot can
+// retry safely without resending an identical body.
+func apiIdempotencyKey(r *http.Request, body []byte) string {
+	if v := strings.TrimSpace(r.Header.Get("Idempotency-Key")); v != "" {
+		return "api:" + cryptoutil.TokenHash("idem:" + v)[:24]
+	}
+	return "api:" + cryptoutil.TokenHash(string(body))[:24]
 }

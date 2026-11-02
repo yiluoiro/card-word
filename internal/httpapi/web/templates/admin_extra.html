@@ -343,10 +343,13 @@
   <div class="panel">
     <div class="panel-head"><h3>创建令牌</h3></div>
     <div class="panel-body">
-      <form method="post" action="/admin/tokens" class="row-form">
+      <form method="post" action="/admin/tokens" class="grid-form">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>名称<input type="text" name="name" placeholder="对接上游" required></label>
+        <label>名称<input type="text" name="name" placeholder="对接上游 / 机器人" required></label>
+        <label>有效期（天）<span class="hint">留空表示长期有效</span><input type="number" name="expires_days" min="1" max="3650" placeholder="90"></label>
+        <label>来源 IP 白名单<span class="hint">逗号分隔，支持 CIDR；留空不限制</span><input type="text" name="allowed_ips" placeholder="203.0.113.10, 198.51.100.0/24"></label>
         <label class="checkbox"><input type="checkbox" name="scope_write" value="1"><span>允许写入（下单 / 导入卡密）</span></label>
+        <label class="checkbox"><input type="checkbox" name="scope_cards" value="1"><span>允许读取卡密（发货对接）</span></label>
         <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 创建</button></div>
       </form>
     </div>

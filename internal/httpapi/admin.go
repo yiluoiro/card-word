@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/yiluoiro/card-word/internal/cryptoutil"
 	"github.com/yiluoiro/card-word/internal/notify"
@@ -348,7 +349,18 @@ func (s *Server) handleAdminTokenCreate(w http.ResponseWriter, r *http.Request) 
 	if r.FormValue("scope_write") != "" {
 		scopes = append(scopes, "orders:write", "cards:write")
 	}
-	token, plain, err := s.db.CreateAPIToken(r.Context(), name, scopes)
+	if r.FormValue("scope_cards") != "" {
+		scopes = append(scopes, "cards:read")
+	}
+	in := store.TokenInput{Name: name, Scopes: scopes}
+	if days := parseInt64(r.FormValue("expires_days")); days > 0 {
+		expires := time.Now().UTC().AddDate(0, 0, int(days))
+		in.ExpiresAt = &expires
+	}
+	in.AllowedIPs = strings.FieldsFunc(r.FormValue("allowed_ips"), func(r rune) bool {
+		return r == ',' || r == '\n' || r == ' ' || r == '\t'
+	})
+	token, plain, err := s.db.CreateAPIToken(r.Context(), in)
 	if err != nil {
 		flashRedirect(w, r, "/admin/tokens", "", "创建失败："+err.Error())
 		return
