@@ -116,14 +116,25 @@
     <button class="btn sm" type="submit">{{template "i_search" .}} 搜索</button>
   </form>
 
+  <form id="bulkProducts" method="post" action="/admin/products/bulk" class="toolbar">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <select name="status">
+      <option value="active">上架</option>
+      <option value="draft">草稿</option>
+      <option value="archived">归档</option>
+    </select>
+    <button class="btn sm" type="submit" data-confirm="对勾选的商品应用该状态？">应用到选中</button>
+  </form>
+
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th>商品</th><th>分类</th><th class="num">价格</th><th class="num">库存</th><th>状态</th><th class="num">操作</th></tr></thead>
+          <thead><tr><th style="width:34px"><input type="checkbox" data-check-all="bulkProducts" aria-label="全选商品"></th><th>商品</th><th>分类</th><th class="num">价格</th><th class="num">库存</th><th>状态</th><th class="num">操作</th></tr></thead>
           <tbody>
           {{range .Products}}
             <tr>
+              <td><input type="checkbox" name="ids" value="{{.ID}}" form="bulkProducts" aria-label="选择 {{.Name}}"></td>
               <td>
                 <div class="primary-cell">{{.Name}}</div>
                 <div class="secondary-cell mono">/p/{{.Slug}}</div>
@@ -142,7 +153,7 @@
               </td>
             </tr>
           {{else}}
-            <tr><td colspan="6" class="muted">还没有商品，点击右上角「新建商品」开始。</td></tr>
+            <tr><td colspan="7" class="muted">还没有商品，点击右上角「新建商品」开始。</td></tr>
           {{end}}
           </tbody>
         </table>
@@ -257,14 +268,26 @@
     <a class="chip {{if eq .Status "disabled"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=disabled">已停用</a>
   </div>
 
+  <form id="bulkCards" method="post" action="/admin/products/{{.Product.ID}}/cards/bulk" class="toolbar">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <select name="action">
+      <option value="disable">停用</option>
+      <option value="enable">恢复可售</option>
+      <option value="delete">删除（仅未售出）</option>
+    </select>
+    <button class="btn sm" type="submit" data-confirm="对勾选的卡密执行该操作？">应用到选中</button>
+    <a class="btn sm ghost" href="/admin/products/{{.Product.ID}}/cards/export.csv?status={{.Status}}">{{template "i_download" .}} 导出 CSV</a>
+  </form>
+
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th>ID</th><th>卡密</th><th>标签</th><th>状态</th><th>售出时间</th><th class="num">操作</th></tr></thead>
+          <thead><tr><th style="width:34px"><input type="checkbox" data-check-all="bulkCards" aria-label="全选卡密"></th><th>ID</th><th>卡密</th><th>标签</th><th>状态</th><th>售出时间</th><th class="num">操作</th></tr></thead>
           <tbody>
           {{range .Cards}}
             <tr>
+              <td><input type="checkbox" name="ids" value="{{.ID}}" form="bulkCards" aria-label="选择卡密 {{.ID}}"></td>
               <td class="mono secondary-cell">{{.ID}}</td>
               <td class="mono">{{.Masked}}</td>
               <td class="secondary-cell">{{if .Label}}{{.Label}}{{else}}—{{end}}</td>
@@ -281,7 +304,7 @@
               </td>
             </tr>
           {{else}}
-            <tr><td colspan="6" class="muted">暂无卡密，先在上方导入。</td></tr>
+            <tr><td colspan="7" class="muted">暂无卡密，先在上方导入。</td></tr>
           {{end}}
           </tbody>
         </table>

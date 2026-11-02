@@ -34,6 +34,15 @@
   });
 
   // Destructive action confirmation.
+  document.querySelectorAll("[data-check-all]").forEach(function (box) {
+    box.addEventListener("change", function () {
+      var target = box.getAttribute("data-check-all");
+      document.querySelectorAll('input[form="' + target + '"]').forEach(function (cb) {
+        cb.checked = box.checked;
+      });
+    });
+  });
+
   document.querySelectorAll("form[data-confirm]").forEach(function (form) {
     form.addEventListener("submit", function (event) {
       if (!window.confirm(form.getAttribute("data-confirm"))) {
