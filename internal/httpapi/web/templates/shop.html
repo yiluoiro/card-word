@@ -52,6 +52,7 @@
   <div class="grid">
     {{range .Products}}
     <a class="card product" href="/p/{{.Slug}}">
+      {{if .CoverPath}}<img class="product-cover" src="/media/{{.CoverPath}}" alt="{{.Name}}" loading="lazy">{{end}}
       <div class="card-head">
         <span class="product-icon">{{template "i_box" .}}</span>
         {{if gt .Stock 0}}
@@ -188,6 +189,7 @@
   <div class="grid">
     {{range .Related}}
     <a class="card product" href="/p/{{.Slug}}">
+      {{if .CoverPath}}<img class="product-cover" src="/media/{{.CoverPath}}" alt="{{.Name}}" loading="lazy">{{end}}
       <div class="card-head">
         <span class="product-icon">{{template "i_box" .}}</span>
         {{if gt .Stock 0}}<span class="badge ok"><span class="dot"></span>有货</span>{{else}}<span class="badge muted">缺货</span>{{end}}
@@ -348,22 +350,34 @@
 
 {{define "admin_login"}}{{template "head" .}}
 <body class="auth">
-<main class="auth-card">
-  <div class="auth-brand">
-    <span class="brand-mark">{{template "i_logo" .}}</span>
-    <div>
-      <h1>{{.Site.Name}}</h1>
-      <div class="sub">管理员控制台</div>
+<aside class="auth-side">
+  <span class="brand-mark">{{template "i_logo" .}}</span>
+  <h2>把每一笔订单<br>变成即时交付</h2>
+  <p>card word 是轻量、可插件化的发卡系统：自动发货、卡密加密、完整审计，单二进制部署。</p>
+  <ul class="checklist">
+    <li>{{template "i_bolt" .}} 支付回调确认后秒级发卡</li>
+    <li>{{template "i_lock" .}} 卡密 AES-256-GCM 加密存储</li>
+    <li>{{template "i_shield" .}} 两步验证与三级角色权限</li>
+  </ul>
+</aside>
+<main class="auth-main">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark">{{template "i_logo" .}}</span>
+      <div>
+        <h1>{{.Site.Name}}</h1>
+        <div class="sub">管理员控制台</div>
+      </div>
     </div>
+    {{if .Error}}<div class="alert err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
+    <form method="post" action="/admin/login" class="form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>用户名<input type="text" name="username" autocomplete="username" required autofocus></label>
+      <label>密码<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn primary block lg" type="submit">{{template "i_lock" .}} 登录</button>
+    </form>
+    <div class="auth-foot">{{template "i_shield" .}} 所有管理操作都会记录来源 IP 与时间。</div>
   </div>
-  {{if .Error}}<div class="alert err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
-  <form method="post" action="/admin/login" class="form">
-    <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <label>用户名<input type="text" name="username" autocomplete="username" required autofocus></label>
-    <label>密码<input type="password" name="password" autocomplete="current-password" required></label>
-    <button class="btn primary block lg" type="submit">{{template "i_lock" .}} 登录</button>
-  </form>
-  <div class="auth-foot">{{template "i_shield" .}} 所有管理操作都会记录来源 IP 与时间。</div>
 </main>
 </body>
 </html>{{end}}

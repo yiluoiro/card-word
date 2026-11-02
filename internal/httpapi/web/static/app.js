@@ -19,6 +19,24 @@
   });
 
   // Auto-submit payment forms (provider redirect handoff).
+  // Turn flash messages into dismissible toasts so they do not shift layout.
+  document.querySelectorAll("[data-toast]").forEach(function (el) {
+    var kind = el.getAttribute("data-toast") === "err" ? "err" : "ok";
+    var toast = document.createElement("div");
+    toast.className = "toast " + kind;
+    toast.innerHTML = el.innerHTML;
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "toast-close";
+    close.setAttribute("aria-label", "关闭");
+    close.textContent = "\u00d7";
+    close.addEventListener("click", function () { toast.remove(); });
+    toast.appendChild(close);
+    document.body.appendChild(toast);
+    el.style.display = "none";
+    window.setTimeout(function () { toast.remove(); }, 6000);
+  });
+
   document.querySelectorAll("form[data-autosubmit]").forEach(function (form) {
     form.submit();
   });

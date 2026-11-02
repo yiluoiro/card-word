@@ -99,8 +99,8 @@
 {{end}}
 
 {{define "flash"}}
-{{if .Flash}}<div class="alert ok">{{template "i_check" .}}<div>{{.Flash}}</div></div>{{end}}
-{{if .Error}}<div class="alert err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
+{{if .Flash}}<div class="alert ok" data-toast="ok">{{template "i_check" .}}<div>{{.Flash}}</div></div>{{end}}
+{{if .Error}}<div class="alert err" data-toast="err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
 {{end}}
 
 {{define "pager"}}

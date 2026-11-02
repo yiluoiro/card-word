@@ -133,6 +133,7 @@ func (s *Server) routes() {
 
 	// Static assets and plugin assets.
 	s.mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler()))
+	s.mux.HandleFunc("GET /media/{name}", s.handleMedia)
 	s.mux.HandleFunc("GET /assets/plugins/{uid}/{path...}", s.handlePluginAsset)
 
 	// Payment webhooks (public, signature verified).
@@ -169,6 +170,7 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/products/{id}/cards", s.staff(store.RoleAdmin, s.handleAdminCardsImport))
 	s.mux.Handle("POST /admin/products/{id}/cards/bulk", s.staff(store.RoleAdmin, s.handleAdminCardsBulk))
 	s.mux.Handle("GET /admin/products/{id}/cards/export.csv", s.staff(store.RoleAdmin, s.handleAdminCardsExport))
+	s.mux.Handle("POST /admin/products/{id}/cover", s.staff(store.RoleAdmin, s.handleProductCoverUpload))
 	s.mux.Handle("POST /admin/cards/{id}/disable", s.staff(store.RoleAdmin, s.handleAdminCardDisable))
 	s.mux.Handle("POST /admin/cards/{id}/reveal", s.staff(store.RoleAdmin, s.handleAdminCardReveal))
 	s.mux.Handle("GET /admin/categories", s.admin(s.handleAdminCategories))

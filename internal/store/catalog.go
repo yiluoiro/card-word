@@ -33,6 +33,7 @@ type Product struct {
 	MinQty       int
 	MaxQty       int
 	Sort         int
+	CoverPath    string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Stock        int
@@ -171,7 +172,7 @@ const productSelect = `
 SELECT p.id, p.category_id, p.name, p.slug, p.summary, p.description, p.price_cents, p.currency,
        p.status, p.min_qty, p.max_qty, p.sort, p.created_at, p.updated_at,
        (SELECT COUNT(*) FROM card_keys c WHERE c.product_id = p.id AND c.status = 'available') AS stock,
-       COALESCE(cat.name, '') AS category_name
+       COALESCE(cat.name, '') AS category_name, p.cover_path
 FROM products p
 LEFT JOIN categories cat ON cat.id = p.category_id`
 
@@ -180,11 +181,24 @@ func scanProduct(row interface{ Scan(...any) error }) (*Product, error) {
 	var created, updated int64
 	if err := row.Scan(&p.ID, &p.CategoryID, &p.Name, &p.Slug, &p.Summary, &p.Description,
 		&p.PriceCents, &p.Currency, &p.Status, &p.MinQty, &p.MaxQty, &p.Sort, &created, &updated,
-		&p.Stock, &p.CategoryName); err != nil {
+		&p.Stock, &p.CategoryName, &p.CoverPath); err != nil {
 		return nil, err
 	}
 	p.CreatedAt, p.UpdatedAt = unixToTime(created), unixToTime(updated)
 	return &p, nil
+}
+
+// SetProductCover points a product at an uploaded cover file.
+func (d *DB) SetProductCover(ctx context.Context, id int64, path string) error {
+	res, err := d.write.ExecContext(ctx,
+		`UPDATE products SET cover_path = ?, updated_at = ? WHERE id = ?`, path, nowUnix(), id)
+	if err != nil {
+		return wrapErr("set product cover", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // ProductInput describes a product create/update request.

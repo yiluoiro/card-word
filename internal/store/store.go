@@ -147,6 +147,9 @@ func (d *DB) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := d.ensureColumn(ctx, "products", "cover_path", "cover_path TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
 	if _, err := d.write.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
 		return fmt.Errorf("store: set user_version: %w", err)
 	}

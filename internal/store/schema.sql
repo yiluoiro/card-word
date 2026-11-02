@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS products (
     min_qty     INTEGER NOT NULL DEFAULT 1,
     max_qty     INTEGER NOT NULL DEFAULT 10,
     sort        INTEGER NOT NULL DEFAULT 0,
+    cover_path  TEXT    NOT NULL DEFAULT '',
     created_at  INTEGER NOT NULL,
     updated_at  INTEGER NOT NULL
 );

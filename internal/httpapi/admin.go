@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -116,7 +117,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	trend := make([]map[string]any, 0, len(daily))
+	var ordersSeries, revenueSeries []int64
 	for _, d := range daily {
+		ordersSeries = append(ordersSeries, d.Orders)
+		revenueSeries = append(revenueSeries, d.RevenueCents)
 		height := int(d.Orders * 100 / maxOrders)
 		if d.Orders > 0 && height < 8 {
 			height = 8
@@ -138,14 +142,48 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		pluginCount = len(s.plugins.Active())
 	}
 	s.render(w, r, "admin_dashboard", map[string]any{
-		"Title":       "概览",
-		"Stats":       stats,
-		"Orders":      orders,
-		"Products":    products,
-		"LowStock":    lowStock,
-		"PluginCount": pluginCount,
-		"Trend":       trend,
+		"Title":        "概览",
+		"Stats":        stats,
+		"Orders":       orders,
+		"Products":     products,
+		"LowStock":     lowStock,
+		"PluginCount":  pluginCount,
+		"Trend":        trend,
+		"SparkOrders":  sparklinePoints(ordersSeries),
+		"SparkRevenue": sparklinePoints(revenueSeries),
 	})
+}
+
+// sparklinePoints builds a 100x30 polyline for a KPI card.
+func sparklinePoints(values []int64) string {
+	if len(values) == 0 {
+		return ""
+	}
+	var max int64
+	for _, v := range values {
+		if v > max {
+			max = v
+		}
+	}
+	if max == 0 {
+		max = 1
+	}
+	var sb strings.Builder
+	n := len(values)
+	for i, v := range values {
+		x := 0.0
+		if n > 1 {
+			x = float64(i) * 100 / float64(n-1)
+		}
+		y := 28 - float64(v)/float64(max)*24
+		sb.WriteString(strconv.FormatFloat(x, 'f', 1, 64))
+		sb.WriteString(",")
+		sb.WriteString(strconv.FormatFloat(y, 'f', 1, 64))
+		if i < n-1 {
+			sb.WriteString(" ")
+		}
+	}
+	return sb.String()
 }
 
 // ---------- categories ----------

@@ -753,3 +753,72 @@ select {
 
 .card.product { min-width: 0; }
 .card.product .card-head { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; }
+
+/* ---------- v0.3: split login, toast, sticky column, sparkline ---------- */
+
+body.auth { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); min-height: 100vh; }
+.auth-side {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center; gap: 24px;
+  padding: 64px 56px;
+  background:
+    radial-gradient(700px 360px at 10% 0%, rgba(99, 102, 241, .20), transparent 62%),
+    radial-gradient(620px 300px at 90% 100%, rgba(14, 165, 233, .16), transparent 60%),
+    var(--surface-2);
+  border-right: 1px solid var(--border);
+}
+.auth-side::after {
+  content: ""; position: absolute; right: -120px; bottom: -140px;
+  width: 360px; height: 360px; border-radius: 50%;
+  background: var(--grad); filter: blur(90px); opacity: .2;
+}
+.auth-side h2 { font-size: 30px; letter-spacing: -.035em; line-height: 1.16; max-width: 420px; }
+.auth-side p { color: var(--text-2); font-size: 14px; max-width: 420px; }
+.auth-side .checklist { max-width: 420px; }
+.auth-main { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+.auth-card { margin: 0; }
+
+.toast {
+  position: fixed; top: 18px; right: 18px; z-index: 100;
+  display: flex; gap: 10px; align-items: flex-start;
+  max-width: 400px; padding: 13px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow-md);
+  font-size: 13px; color: var(--text);
+  animation: toast-in .18s ease;
+}
+.toast.ok { border-color: var(--ok-border); }
+.toast.ok svg { color: var(--ok); }
+.toast.err { border-color: var(--danger-border); }
+.toast.err svg { color: var(--danger); }
+.toast .toast-close {
+  margin-left: 4px; border: 0; background: transparent; cursor: pointer;
+  color: var(--text-3); font-size: 16px; line-height: 1; padding: 0 2px;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.table.sticky-first th:first-child,
+.table.sticky-first td:first-child {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--border);
+}
+.table.sticky-first th:first-child { background: var(--surface-2); }
+
+.stat .spark { position: absolute; right: 12px; bottom: 10px; width: 88px; height: 30px; opacity: .9; }
+.stat .spark svg { width: 100%; height: 100%; }
+.stat .spark polyline { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 900px) {
+  body.auth { grid-template-columns: 1fr; }
+  .auth-side { display: none; }
+  .stat .spark { display: none; }
+}
+
+.product-cover {
+  display: block; width: 100%; aspect-ratio: 16 / 10;
+  object-fit: cover; border-radius: 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+}
+.card.product .product-cover { margin-bottom: 2px; }

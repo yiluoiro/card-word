@@ -21,11 +21,13 @@
       <div class="label">{{template "i_receipt" .}} 今日订单</div>
       <div class="value">{{.Stats.TodayOrders}}</div>
       <div class="delta">累计 {{.Stats.TotalOrders}} 单</div>
+      {{if .SparkOrders}}<div class="spark" aria-hidden="true"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="{{.SparkOrders}}"/></svg></div>{{end}}
     </div>
     <div class="stat">
       <div class="label">{{template "i_bolt" .}} 今日收入</div>
       <div class="value">{{money .Stats.TodayRevenue .Currency}}</div>
       <div class="delta">累计 {{money .Stats.RevenueCents .Currency}}</div>
+      {{if .SparkRevenue}}<div class="spark" aria-hidden="true"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="{{.SparkRevenue}}"/></svg></div>{{end}}
     </div>
     <div class="stat">
       <div class="label">{{template "i_check" .}} 已支付订单</div>
@@ -223,6 +225,25 @@
       </form>
     </div>
   </div>
+
+  {{if .Product}}
+  <div class="panel">
+    <div class="panel-head">
+      <h3>商品封面</h3>
+      <span class="panel-sub">PNG / JPEG / WebP，最大 2MB，按魔数校验类型</span>
+    </div>
+    <div class="panel-body">
+      {{if .Product.CoverPath}}
+      <img class="product-cover" src="/media/{{.Product.CoverPath}}" alt="{{.Product.Name}} 封面" style="max-width:320px">
+      {{end}}
+      <form method="post" action="/admin/products/{{.Product.ID}}/cover" enctype="multipart/form-data" class="form" style="margin-top:14px">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <input type="file" name="cover" accept="image/png,image/jpeg,image/webp" required>
+        <div class="actions"><button class="btn" type="submit">上传封面</button></div>
+      </form>
+    </div>
+  </div>
+  {{end}}
 </main>
 </div>
 </body>
@@ -349,7 +370,7 @@
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
+        <table class="table sticky-first">
           <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>买家</th><th>状态</th><th>时间</th></tr></thead>
           <tbody>
           {{range .Orders}}
