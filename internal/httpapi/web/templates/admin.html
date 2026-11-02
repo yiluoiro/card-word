@@ -318,6 +318,7 @@
       <option value="refunded" {{if eq .Status "refunded"}}selected{{end}}>已退款</option>
     </select>
     <button class="btn sm" type="submit">{{template "i_search" .}} 筛选</button>
+    <a class="btn sm" href="/admin/orders/export.csv?status={{.Status}}&q={{.Search}}">{{template "i_download" .}} 导出 CSV</a>
   </form>
 
   <div class="panel">

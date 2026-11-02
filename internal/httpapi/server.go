@@ -165,6 +165,7 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/categories", s.admin(s.handleAdminCategorySave))
 	s.mux.Handle("POST /admin/categories/{id}/delete", s.admin(s.handleAdminCategoryDelete))
 	s.mux.Handle("GET /admin/orders", s.staff(store.RoleViewer, s.handleAdminOrders))
+	s.mux.Handle("GET /admin/orders/export.csv", s.staff(store.RoleAdmin, s.handleAdminOrdersExport))
 	s.mux.Handle("GET /admin/orders/{no}", s.staff(store.RoleViewer, s.handleAdminOrder))
 	s.mux.Handle("POST /admin/orders/{no}/fulfill", s.staff(store.RoleAdmin, s.handleAdminFulfill))
 	s.mux.Handle("POST /admin/orders/{no}/retry", s.staff(store.RoleAdmin, s.handleAdminRetry))
