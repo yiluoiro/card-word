@@ -12,8 +12,9 @@ import (
 	"github.com/yiluoiro/card-word/internal/store"
 )
 
-// requireAPIToken authenticates machine callers via bearer tokens.
-func (s *Server) requireAPIToken(w http.ResponseWriter, r *http.Request, scope string) bool {
+// requireAPIToken authenticates machine callers via bearer tokens and returns
+// the token record so handlers can apply finer grained checks.
+func (s *Server) requireAPIToken(w http.ResponseWriter, r *http.Request, scope string) (*store.APIToken, bool) {
 	header := r.Header.Get("Authorization")
 	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 	if token == "" || token == header {
@@ -21,19 +22,19 @@ func (s *Server) requireAPIToken(w http.ResponseWriter, r *http.Request, scope s
 	}
 	if token == "" {
 		writeAPIError(w, http.StatusUnauthorized, "unauthorized", "missing API token")
-		return false
+		return nil, false
 	}
 	record, err := s.db.APITokenByPlain(r.Context(), token)
 	if err != nil {
 		writeAPIError(w, http.StatusUnauthorized, "unauthorized", "invalid API token")
-		return false
+		return nil, false
 	}
 	if scope != "" && !hasScope(record.Scopes, scope) {
 		writeAPIError(w, http.StatusForbidden, "forbidden", "token lacks scope "+scope)
-		return false
+		return nil, false
 	}
 	_ = s.db.TouchAPIToken(r.Context(), record.ID)
-	return true
+	return record, true
 }
 
 func hasScope(scopes []string, want string) bool {
@@ -46,14 +47,14 @@ func hasScope(scopes []string, want string) bool {
 }
 
 func (s *Server) handleAPIPing(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "") {
+	if _, ok := s.requireAPIToken(w, r, ""); !ok {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "service": "card word"})
 }
 
 func (s *Server) handleAPIProducts(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "products:read") {
+	if _, ok := s.requireAPIToken(w, r, "products:read"); !ok {
 		return
 	}
 	products, err := s.db.ListProducts(r.Context(), store.ProductFilter{Status: store.ProductActive, Limit: 200})
@@ -69,7 +70,7 @@ func (s *Server) handleAPIProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPIProduct(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "products:read") {
+	if _, ok := s.requireAPIToken(w, r, "products:read"); !ok {
 		return
 	}
 	product, err := s.db.ProductBySlug(r.Context(), r.PathValue("slug"))
@@ -96,7 +97,10 @@ func productJSON(p store.Product) map[string]any {
 }
 
 func (s *Server) handleAPIOrder(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "orders:read") {
+	// Reading an order must not imply reading the purchased secrets: card keys
+	// are only returned when the token also holds cards:read.
+	record, ok := s.requireAPIToken(w, r, "orders:read")
+	if !ok {
 		return
 	}
 	order, err := s.db.OrderByNo(r.Context(), r.PathValue("no"))
@@ -105,7 +109,7 @@ func (s *Server) handleAPIOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payload := orderJSON(*order)
-	if order.Status == store.OrderDelivered {
+	if order.Status == store.OrderDelivered && hasScope(record.Scopes, "cards:read") {
 		if cards, err := s.db.OrderCards(r.Context(), order.ID); err == nil {
 			secrets := make([]string, 0, len(cards))
 			for _, c := range cards {
@@ -113,6 +117,8 @@ func (s *Server) handleAPIOrder(w http.ResponseWriter, r *http.Request) {
 			}
 			payload["cards"] = secrets
 		}
+	} else if order.Status == store.OrderDelivered {
+		payload["cards_redacted"] = true
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": payload})
 }
@@ -154,7 +160,7 @@ type apiCreateOrderResponse struct {
 }
 
 func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "orders:write") {
+	if _, ok := s.requireAPIToken(w, r, "orders:write"); !ok {
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
@@ -228,7 +234,7 @@ func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPICloseOrder(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "orders:write") {
+	if _, ok := s.requireAPIToken(w, r, "orders:write"); !ok {
 		return
 	}
 	orderNo := r.PathValue("no")
@@ -247,7 +253,7 @@ type apiAddCardsRequest struct {
 }
 
 func (s *Server) handleAPIAddCards(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAPIToken(w, r, "cards:write") {
+	if _, ok := s.requireAPIToken(w, r, "cards:write"); !ok {
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 4<<20))

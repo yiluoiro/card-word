@@ -37,7 +37,17 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "加载分类失败。")
 		return
 	}
-	products, err := s.db.ListProducts(ctx, store.ProductFilter{Status: store.ProductActive, Limit: 200})
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	catSlug := strings.TrimSpace(r.URL.Query().Get("cat"))
+	filter := store.ProductFilter{Status: store.ProductActive, Search: query, Limit: 200}
+	var activeCat *store.Category
+	if catSlug != "" {
+		if c, err := s.db.CategoryBySlug(ctx, catSlug); err == nil {
+			activeCat = c
+			filter.CategoryID = c.ID
+		}
+	}
+	products, err := s.db.ListProducts(ctx, filter)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "加载商品失败。")
 		return
@@ -46,6 +56,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		"Title":      s.setting(store.SettingSiteName, "Card Word"),
 		"Categories": categories,
 		"Products":   products,
+		"Search":     query,
+		"ActiveCat":  activeCat,
 	})
 }
 

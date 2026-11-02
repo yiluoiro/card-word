@@ -86,8 +86,10 @@ func (c *Client) List(ctx context.Context, remoteURL string) ([]Entry, error) {
 }
 
 func (c *Client) fetch(ctx context.Context, url string) ([]Entry, error) {
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
-		return nil, errors.New("market: index url must be http(s)")
+	// The index decides what operators can install, so it must not be
+	// tamperable in transit.
+	if !strings.HasPrefix(url, "https://") {
+		return nil, errors.New("market: index url must use https")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

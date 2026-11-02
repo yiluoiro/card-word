@@ -217,6 +217,11 @@ func (e *Epay) VerifyCallback(_ context.Context, params map[string]string, body 
 	if !hmac.Equal([]byte(strings.ToLower(want)), []byte(strings.ToLower(sign))) {
 		return nil, errors.New("payment: epay signature mismatch")
 	}
+	// A callback signed with our key but carrying another merchant id means a
+	// misconfigured or swapped gateway; never settle an order in that case.
+	if pid := strings.TrimSpace(params["pid"]); pid != "" && pid != e.cfg.PID {
+		return nil, fmt.Errorf("payment: epay pid mismatch (got %q)", pid)
+	}
 	orderNo := firstNonEmpty(params["out_trade_no"], params["trade_no"])
 	if orderNo == "" {
 		return nil, errors.New("payment: epay callback without trade number")

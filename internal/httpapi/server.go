@@ -44,6 +44,8 @@ type Server struct {
 
 	dummyMu     sync.Mutex
 	cachedDummy string
+
+	guard *loginGuard
 }
 
 // Deps bundles the collaborators passed to New.
@@ -81,6 +83,7 @@ func New(d Deps) (*Server, error) {
 		mux:       http.NewServeMux(),
 		startedAt: time.Now(),
 		settings:  map[string]string{},
+		guard:     newLoginGuard(),
 	}
 	if s.payments == nil {
 		s.payments = payment.NewRegistry()
@@ -181,6 +184,8 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/tokens", s.admin(s.handleAdminTokenCreate))
 	s.mux.Handle("POST /admin/tokens/{id}/revoke", s.admin(s.handleAdminTokenRevoke))
 	s.mux.Handle("GET /admin/audit", s.admin(s.handleAdminAudit))
+	s.mux.Handle("GET /admin/account", s.admin(s.handleAdminAccount))
+	s.mux.Handle("POST /admin/account/password", s.admin(s.handleAdminChangePassword))
 	s.mux.HandleFunc("GET /admin/plugins/{uid}/console", s.handlePluginConsole)
 }
 

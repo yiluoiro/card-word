@@ -495,6 +495,32 @@ select { appearance: none; background-image: url("data:image/svg+xml;charset=utf
 .plugin-foot { padding: 12px 18px; border-top: 1px solid var(--border); background: var(--surface-2); display: flex; gap: 8px; flex-wrap: wrap; }
 .pill-group { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* ---------- charts ---------- */
+
+.chart { display: flex; align-items: flex-end; gap: 10px; height: 176px; padding: 18px 4px 0; }
+.chart-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.chart-bar {
+  width: 100%; max-width: 46px; min-height: 3px;
+  background: linear-gradient(180deg, #818cf8, #4f46e5);
+  border-radius: 7px 7px 3px 3px;
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
+  transition: filter .12s ease;
+}
+.chart-col:hover .chart-bar { filter: brightness(1.08); }
+.chart-bar > span {
+  position: absolute; top: -19px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+.chart-label { font-size: 11px; color: var(--text-4); white-space: nowrap; }
+
+/* ---------- checklist ---------- */
+
+.checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--text-2); }
+.checklist li { display: flex; gap: 9px; align-items: flex-start; line-height: 1.6; }
+.checklist svg { color: var(--ok); margin-top: 2px; flex: none; }
+.checklist li:last-child svg { color: var(--warn); }
+
 /* ---------- footer ---------- */
 
 .footer { border-top: 1px solid var(--border); background: var(--surface); padding: 20px 0; margin-top: auto; }

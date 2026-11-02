@@ -56,6 +56,11 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "请输入用户名和密码。")
 		return
 	}
+	if wait, locked := s.guard.locked(strings.ToLower(username)); locked {
+		s.log.Warn("login rejected by account lock", "username", username, "ip", ip, "retry_after", wait.String())
+		s.renderError(w, r, http.StatusTooManyRequests, "该账号连续登录失败次数过多，请 15 分钟后再试。")
+		return
+	}
 
 	user, err := s.db.UserByUsername(r.Context(), username)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
@@ -74,6 +79,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if user == nil || !ok {
+		s.guard.fail(strings.ToLower(username))
 		_ = s.db.Audit(r.Context(), username, "auth.login.failed", "", ip, "invalid credentials")
 		s.log.Warn("failed admin login", "username", username, "ip", ip)
 		s.renderError(w, r, http.StatusUnauthorized, "用户名或密码错误。")
@@ -119,6 +125,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.db.TouchLastLogin(r.Context(), user.ID)
+	s.guard.reset(strings.ToLower(username))
 	_ = s.db.Audit(r.Context(), user.Username, "auth.login", "", ip, "session created")
 	s.setSessionCookies(w, token, csrfToken, expires)
 	redirect(w, r, "/admin")

@@ -64,11 +64,11 @@
 
   <div class="sidebar-foot">
     <div class="user-chip">
-      <span class="avatar">{{if .User}}{{printf "%.1s" .User.Username}}{{else}}?{{end}}</span>
-      <span class="brand-text">
+      <a class="avatar" href="/admin/account" title="账号安全">{{if .User}}{{printf "%.1s" .User.Username}}{{else}}?{{end}}</a>
+      <a class="brand-text" href="/admin/account" style="min-width:0">
         <span class="u-name">{{if .User}}{{.User.Username}}{{else}}未登录{{end}}</span>
-        <span class="u-role">管理员</span>
-      </span>
+        <span class="u-role">账号安全</span>
+      </a>
       <form method="post" action="/admin/logout" class="inline" style="margin-left:auto">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <button class="btn ghost sm" type="submit" title="退出登录">{{template "i_logout" .}}</button>

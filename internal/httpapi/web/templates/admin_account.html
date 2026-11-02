@@ -1,0 +1,61 @@
+{{define "admin_account"}}{{template "head" .}}
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
+  {{template "flash" .}}
+  <div class="page-head">
+    <div class="titles">
+      <h1>账号安全</h1>
+      <div class="sub">管理员凭据与登录状态</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>当前账号</h3><span class="badge accent">{{.Account.Role}}</span></div>
+    <div class="panel-body">
+      <dl class="kv">
+        <dt>用户名</dt><dd>{{.Account.Username}}</dd>
+        <dt>创建时间</dt><dd>{{datetime .Account.CreatedAt}}</dd>
+        <dt>最近登录</dt><dd>{{if .Account.LastLoginAt}}{{datetime .Account.LastLoginAt}}{{else}}—{{end}}</dd>
+        <dt>会话策略</dt><dd class="small">绝对有效期 {{.SessionTTL}} · 空闲超时 {{.SessionIdle}}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>修改密码</h3>
+      <span class="panel-sub">修改后其它设备的会话会立即失效</span>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="/admin/account/password" class="form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>当前密码<input type="password" name="current_password" autocomplete="current-password" required></label>
+        <div class="row">
+          <label>新密码<span class="hint">至少 12 个字符</span><input type="password" name="new_password" autocomplete="new-password" minlength="12" required></label>
+          <label>确认新密码<input type="password" name="confirm_password" autocomplete="new-password" minlength="12" required></label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" type="submit">{{template "i_lock" .}} 更新密码</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>安全建议</h3></div>
+    <div class="panel-body">
+      <ul class="checklist">
+        <li>{{template "i_check" .}} 使用 16 位以上、与其它站点不同的密码（推荐密码管理器生成）</li>
+        <li>{{template "i_check" .}} 生产环境务必启用 HTTPS：会话 Cookie 会自动加上 <code>__Host-</code> 前缀与 Secure 属性</li>
+        <li>{{template "i_check" .}} 后台开启「强制插件签名」并只信任自己的公钥</li>
+        <li>{{template "i_alert" .}} 未实现：双因素认证（TOTP）与多管理员角色，已在路线图中</li>
+      </ul>
+    </div>
+  </div>
+</main>
+</div>
+</body>
+</html>{{end}}

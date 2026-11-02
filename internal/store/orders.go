@@ -20,6 +20,11 @@ const (
 	OrderRefunded  = "refunded"
 )
 
+// QueryTokenTTL bounds how long a buyer query credential stays valid. A
+// credential that never expires turns every leaked URL into permanent access
+// to the purchased card keys.
+const QueryTokenTTL = 30 * 24 * time.Hour
+
 // Order is a purchase of quantity units of one product.
 type Order struct {
 	ID             int64
@@ -197,9 +202,14 @@ func (d *DB) OrderByID(ctx context.Context, id int64) (*Order, error) {
 // VerifyOrderQueryToken checks a buyer query credential.
 func (d *DB) VerifyOrderQueryToken(ctx context.Context, orderNo, token string) (bool, error) {
 	var hash string
-	err := d.read.QueryRowContext(ctx, `SELECT query_token_hash FROM orders WHERE order_no = ?`, orderNo).Scan(&hash)
+	var created int64
+	err := d.read.QueryRowContext(ctx,
+		`SELECT query_token_hash, created_at FROM orders WHERE order_no = ?`, orderNo).Scan(&hash, &created)
 	if err != nil {
 		return false, wrapErr("get order token", err)
+	}
+	if time.Since(unixToTime(created)) > QueryTokenTTL {
+		return false, nil
 	}
 	return cryptoutil.TokenHash(token) == hash, nil
 }
@@ -216,24 +226,8 @@ type OrderFilter struct {
 // ListOrders returns orders for the admin console.
 func (d *DB) ListOrders(ctx context.Context, f OrderFilter) ([]Order, error) {
 	q := orderSelect
-	var where []string
-	var args []any
-	if f.Status != "" {
-		where = append(where, "status = ?")
-		args = append(args, f.Status)
-	}
-	if f.Email != "" {
-		where = append(where, "email = ?")
-		args = append(args, f.Email)
-	}
-	if f.Search != "" {
-		where = append(where, "(order_no LIKE ? OR email LIKE ? OR product_name LIKE ?)")
-		like := "%" + f.Search + "%"
-		args = append(args, like, like, like)
-	}
-	if len(where) > 0 {
-		q += " WHERE " + strings.Join(where, " AND ")
-	}
+	clause, args := ordersWhere(f)
+	q += clause
 	q += " ORDER BY id DESC"
 	if f.Limit <= 0 || f.Limit > 500 {
 		f.Limit = 100
@@ -254,6 +248,83 @@ func (d *DB) ListOrders(ctx context.Context, f OrderFilter) ([]Order, error) {
 		out = append(out, *o)
 	}
 	return out, wrapErr("list orders", rows.Err())
+}
+
+func ordersWhere(f OrderFilter) (string, []any) {
+	var where []string
+	var args []any
+	if f.Status != "" {
+		where = append(where, "status = ?")
+		args = append(args, f.Status)
+	}
+	if f.Email != "" {
+		where = append(where, "email = ?")
+		args = append(args, f.Email)
+	}
+	if f.Search != "" {
+		where = append(where, "(order_no LIKE ? OR email LIKE ? OR product_name LIKE ?)")
+		like := "%" + f.Search + "%"
+		args = append(args, like, like, like)
+	}
+	if len(where) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(where, " AND "), args
+}
+
+// CountOrders returns how many orders match a filter, for pagination.
+func (d *DB) CountOrders(ctx context.Context, f OrderFilter) (int, error) {
+	clause, args := ordersWhere(f)
+	var n int
+	err := d.read.QueryRowContext(ctx, `SELECT COUNT(*) FROM orders`+clause, args...).Scan(&n)
+	return n, wrapErr("count orders", err)
+}
+
+// DayStat is one bucket of the sales trend chart.
+type DayStat struct {
+	Date        string
+	Orders      int64
+	RevenueCents int64
+}
+
+// DailyStats aggregates paid orders per day for the last n days, oldest first.
+func (d *DB) DailyStats(ctx context.Context, days int) ([]DayStat, error) {
+	if days <= 0 || days > 90 {
+		days = 7
+	}
+	rows, err := d.read.QueryContext(ctx, `
+		SELECT strftime('%Y-%m-%d', created_at, 'unixepoch') AS day,
+		       COUNT(*),
+		       COALESCE(SUM(CASE WHEN status IN ('paid','delivered') THEN total_cents ELSE 0 END), 0)
+		FROM orders
+		WHERE created_at >= ?
+		GROUP BY day ORDER BY day ASC`,
+		time.Now().UTC().AddDate(0, 0, -days+1).Truncate(24*time.Hour).Unix())
+	if err != nil {
+		return nil, wrapErr("daily stats", err)
+	}
+	defer rows.Close()
+	byDay := map[string]DayStat{}
+	for rows.Next() {
+		var s DayStat
+		if err := rows.Scan(&s.Date, &s.Orders, &s.RevenueCents); err != nil {
+			return nil, wrapErr("scan daily stats", err)
+		}
+		byDay[s.Date] = s
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapErr("daily stats", err)
+	}
+	out := make([]DayStat, 0, days)
+	for i := days - 1; i >= 0; i-- {
+		day := time.Now().UTC().AddDate(0, 0, -i).Format("2006-01-02")
+		stat, ok := byDay[day]
+		if !ok {
+			stat = DayStat{Date: day}
+		}
+		out = append(out, stat)
+	}
+	return out, nil
 }
 
 // OrderStats aggregates counters for the dashboard.
@@ -382,6 +453,19 @@ func (d *DB) FulfillOrder(ctx context.Context, orderNo, driver, txnID string, am
 			 VALUES (?, ?, ?, ?, 'captured', ?, ?)`,
 			order.ID, driver, txnID, amountCents, truncate(raw, 2000), now); err != nil {
 			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				// The same provider transaction must never settle two orders:
+				// that would either duplicate delivery or silently swallow a
+				// genuine payment. Only a replay for the same order is benign.
+				var existingOrderID int64
+				if qerr := tx.QueryRowContext(ctx,
+					`SELECT order_id FROM payments WHERE driver = ? AND txn_id = ?`,
+					driver, txnID).Scan(&existingOrderID); qerr != nil {
+					return wrapErr("inspect duplicate payment", qerr)
+				}
+				if existingOrderID != order.ID {
+					return fmt.Errorf("store: txn %s already settled order %d, refusing order %s: %w",
+						txnID, existingOrderID, orderNo, ErrConflict)
+				}
 				result.Order = order
 				result.AlreadyDone = true
 				return nil

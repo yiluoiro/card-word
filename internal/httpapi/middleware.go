@@ -30,6 +30,16 @@ const (
 	cookieCSRF    = "cw_csrf"
 )
 
+// cookieName applies the __Host- prefix on HTTPS deployments. That prefix is
+// browser enforced: the cookie must be Secure, Path=/ and carry no Domain, so
+// a sibling subdomain cannot overwrite the admin session cookie.
+func (s *Server) cookieName(base string) string {
+	if s.cfg.Secure() {
+		return "__Host-" + base
+	}
+	return base
+}
+
 func requestIDFrom(ctx context.Context) string {
 	if v, ok := ctx.Value(ctxRequestID).(string); ok {
 		return v
@@ -164,7 +174,7 @@ func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		var sess *store.Session
-		if c, err := r.Cookie(cookieSession); err == nil && c.Value != "" {
+		if c, err := r.Cookie(s.cookieName(cookieSession)); err == nil && c.Value != "" {
 			stored, err := s.db.SessionByTokenHash(ctx, cryptoutil.TokenHash(c.Value))
 			switch {
 			case err == nil:
@@ -192,7 +202,7 @@ func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 		} else {
 			// Guests get a double submit token so plain forms stay CSRF safe.
 			token := ""
-			if c, err := r.Cookie(cookieCSRF); err == nil {
+			if c, err := r.Cookie(s.cookieName(cookieCSRF)); err == nil {
 				token = c.Value
 			}
 			if token == "" || len(token) < 32 {
@@ -302,7 +312,7 @@ func (s *Server) originAllowed(r *http.Request) bool {
 
 func (s *Server) setSessionCookies(w http.ResponseWriter, sessionToken, csrf string, expires time.Time) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     cookieSession,
+		Name:     s.cookieName(cookieSession),
 		Value:    sessionToken,
 		Path:     "/",
 		Expires:  expires,
@@ -311,7 +321,7 @@ func (s *Server) setSessionCookies(w http.ResponseWriter, sessionToken, csrf str
 		SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     cookieCSRF,
+		Name:     s.cookieName(cookieCSRF),
 		Value:    csrf,
 		Path:     "/",
 		Expires:  expires,
@@ -323,7 +333,7 @@ func (s *Server) setSessionCookies(w http.ResponseWriter, sessionToken, csrf str
 
 func (s *Server) setCSRFCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     cookieCSRF,
+		Name:     s.cookieName(cookieCSRF),
 		Value:    token,
 		Path:     "/",
 		Expires:  time.Now().Add(24 * time.Hour),
@@ -334,7 +344,7 @@ func (s *Server) setCSRFCookie(w http.ResponseWriter, token string) {
 }
 
 func (s *Server) clearSessionCookies(w http.ResponseWriter) {
-	for _, name := range []string{cookieSession, cookieCSRF} {
+	for _, name := range []string{s.cookieName(cookieSession), s.cookieName(cookieCSRF)} {
 		http.SetCookie(w, &http.Cookie{
 			Name:     name,
 			Value:    "",

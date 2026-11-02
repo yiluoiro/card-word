@@ -18,9 +18,21 @@
     </div>
   </section>
 
+  <form class="toolbar" method="get" action="/" style="margin-bottom:14px">
+    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或关键字" style="min-width:240px">
+    {{if .ActiveCat}}<input type="hidden" name="cat" value="{{.ActiveCat.Slug}}">{{end}}
+    <button class="btn sm" type="submit">{{template "i_search" .}} 搜索</button>
+    {{if or .Search .ActiveCat}}<a class="btn sm ghost" href="/">清除筛选</a>{{end}}
+  </form>
+
   {{if .Categories}}
   <div class="chips">
-    {{range .Categories}}<span class="chip">{{template "i_layers" .}} {{.Name}}</span>{{end}}
+    <a class="chip {{if not .ActiveCat}}active{{end}}" href="/{{if .Search}}?q={{.Search}}{{end}}">全部</a>
+    {{range .Categories}}
+    <a class="chip {{if and $.ActiveCat (eq $.ActiveCat.Slug .Slug)}}active{{end}}" href="/?cat={{.Slug}}{{if $.Search}}&q={{$.Search}}{{end}}">
+      {{template "i_layers" .}} {{.Name}}
+    </a>
+    {{end}}
   </div>
   {{end}}
 

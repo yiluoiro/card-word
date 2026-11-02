@@ -102,6 +102,36 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 			lowStock = append(lowStock, p)
 		}
 	}
+	daily, err := s.db.DailyStats(ctx, 7)
+	if err != nil {
+		s.log.Warn("daily stats failed", "error", err)
+		daily = nil
+	}
+	currency := s.setting(store.SettingCurrency, "CNY")
+	var maxOrders int64 = 1
+	for _, d := range daily {
+		if d.Orders > maxOrders {
+			maxOrders = d.Orders
+		}
+	}
+	trend := make([]map[string]any, 0, len(daily))
+	for _, d := range daily {
+		height := int(d.Orders * 100 / maxOrders)
+		if d.Orders > 0 && height < 8 {
+			height = 8
+		}
+		label := d.Date
+		if len(label) >= 10 {
+			label = label[5:]
+		}
+		trend = append(trend, map[string]any{
+			"Label":   label,
+			"Orders":  d.Orders,
+			"Revenue": formatMoney(d.RevenueCents, currency),
+			"Height":  height,
+		})
+	}
+
 	var pluginCount int
 	if s.plugins != nil {
 		pluginCount = len(s.plugins.Active())
@@ -113,6 +143,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"Products":    products,
 		"LowStock":    lowStock,
 		"PluginCount": pluginCount,
+		"Trend":       trend,
 	})
 }
 

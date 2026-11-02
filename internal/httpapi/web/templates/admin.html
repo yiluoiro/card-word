@@ -44,6 +44,20 @@
     </div>
   </div>
 
+  <div class="panel">
+    <div class="panel-head"><h3>近 7 天订单</h3><span class="panel-sub">按下单时间统计，含未支付订单</span></div>
+    <div class="panel-body">
+      <div class="chart">
+        {{range .Trend}}
+        <div class="chart-col" title="{{.Label}} · {{.Orders}} 单 · {{.Revenue}}">
+          <div class="chart-bar" style="height:{{.Height}}%"><span>{{.Orders}}</span></div>
+          <div class="chart-label">{{.Label}}</div>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
   {{if .LowStock}}
   <div class="alert warn">
     {{template "i_alert" .}}
