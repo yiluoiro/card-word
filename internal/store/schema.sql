@@ -5,10 +5,35 @@ CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     password_hash TEXT    NOT NULL,
-    role          TEXT    NOT NULL DEFAULT 'admin',
+    role          TEXT    NOT NULL DEFAULT 'owner',
+    totp_secret   TEXT    NOT NULL DEFAULT '',
+    totp_enabled  INTEGER NOT NULL DEFAULT 0,
+    disabled      INTEGER NOT NULL DEFAULT 0,
     created_at    INTEGER NOT NULL,
-    last_login_at INTEGER
+    last_login_at INTEGER,
+    updated_at    INTEGER NOT NULL DEFAULT 0
 );
+
+-- Pending second factor challenges. The token is stored hashed and expires
+-- quickly; attempts are capped so a stolen challenge cannot be brute forced.
+CREATE TABLE IF NOT EXISTS login_challenges (
+    id         TEXT    PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT    NOT NULL UNIQUE,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_challenges_expires ON login_challenges(expires_at);
+
+-- One time recovery codes for lost authenticators.
+CREATE TABLE IF NOT EXISTS recovery_codes (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code_hash TEXT    NOT NULL,
+    used_at   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_recovery_user ON recovery_codes(user_id);
 
 CREATE TABLE IF NOT EXISTS sessions (
     id           TEXT    PRIMARY KEY,

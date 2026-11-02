@@ -85,6 +85,23 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusUnauthorized, "用户名或密码错误。")
 		return
 	}
+	if user.Disabled {
+		s.audit(r, "auth.login.disabled", user.Username, "")
+		s.renderError(w, r, http.StatusForbidden, "该账号已被禁用，请联系站点所有者。")
+		return
+	}
+	if user.TOTPEnabled {
+		_, challengeToken, err := s.db.CreateChallenge(r.Context(), user.ID)
+		if err != nil {
+			s.log.Error("failed to create login challenge", "error", err)
+			s.renderError(w, r, http.StatusInternalServerError, "登录流程初始化失败。")
+			return
+		}
+		s.setTwoFactorCookie(w, challengeToken)
+		s.audit(r, "auth.2fa.challenge", user.Username, "password verified, waiting for TOTP")
+		redirect(w, r, "/admin/login/2fa")
+		return
+	}
 
 	token, err := cryptoutil.RandomToken(32)
 	if err != nil {
@@ -170,4 +187,149 @@ func (s *Server) audit(r *http.Request, action, target, detail string) {
 	if err := s.db.Audit(ctx, actor, action, target, s.clientIP(r), detail); err != nil {
 		s.log.Warn("audit write failed", "action", action, "error", err)
 	}
+}
+
+const cookieTwoFactor = "cw_2fa"
+
+func (s *Server) setTwoFactorCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     s.cookieName(cookieTwoFactor),
+		Value:    token,
+		Path:     "/admin",
+		MaxAge:   int(store.ChallengeTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   s.cfg.Secure(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (s *Server) clearTwoFactorCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     s.cookieName(cookieTwoFactor),
+		Value:    "",
+		Path:     "/admin",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.cfg.Secure(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// startSession issues a fresh session, rotating every previous one.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *store.User) error {
+	token, err := cryptoutil.RandomToken(32)
+	if err != nil {
+		return err
+	}
+	sessionID, err := cryptoutil.RandomToken(16)
+	if err != nil {
+		return err
+	}
+	csrfToken, err := cryptoutil.RandomToken(32)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	expires := now.Add(s.cfg.SessionTTL)
+	sess := &store.Session{
+		ID:         sessionID,
+		UserID:     user.ID,
+		TokenHash:  cryptoutil.TokenHash(token),
+		CSRFToken:  csrfToken,
+		IP:         s.clientIP(r),
+		UserAgent:  truncateUA(r.UserAgent()),
+		CreatedAt:  now,
+		LastSeenAt: now,
+		ExpiresAt:  expires,
+	}
+	if err := s.db.DeleteUserSessions(r.Context(), user.ID, ""); err != nil {
+		s.log.Warn("failed to rotate sessions", "error", err)
+	}
+	if err := s.db.CreateSession(r.Context(), sess); err != nil {
+		return err
+	}
+	_ = s.db.TouchLastLogin(r.Context(), user.ID)
+	s.setSessionCookies(w, token, csrfToken, expires)
+	return nil
+}
+
+func (s *Server) handleLoginTwoFactorForm(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie(s.cookieName(cookieTwoFactor))
+	if err != nil || c.Value == "" {
+		redirect(w, r, "/admin/login")
+		return
+	}
+	ch, err := s.db.ChallengeByToken(r.Context(), c.Value)
+	if err != nil || time.Now().UTC().After(ch.ExpiresAt) {
+		s.clearTwoFactorCookie(w)
+		redirect(w, r, "/admin/login")
+		return
+	}
+	s.render(w, r, "admin_login_2fa", map[string]any{"Title": "两步验证"})
+}
+
+func (s *Server) handleLoginTwoFactorSubmit(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie(s.cookieName(cookieTwoFactor))
+	if err != nil || c.Value == "" {
+		redirect(w, r, "/admin/login")
+		return
+	}
+	ch, err := s.db.ChallengeByToken(r.Context(), c.Value)
+	if err != nil || time.Now().UTC().After(ch.ExpiresAt) {
+		s.clearTwoFactorCookie(w)
+		redirect(w, r, "/admin/login")
+		return
+	}
+	if ch.Attempts >= store.MaxChallengeAttempts {
+		_ = s.db.DeleteChallenge(r.Context(), ch.ID)
+		s.clearTwoFactorCookie(w)
+		s.renderError(w, r, http.StatusTooManyRequests, "验证尝试次数过多，请重新登录。")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "表单格式错误。")
+		return
+	}
+	code := strings.TrimSpace(r.FormValue("code"))
+	user, err := s.db.UserByID(r.Context(), ch.UserID)
+	if err != nil || user.Disabled {
+		_ = s.db.DeleteChallenge(r.Context(), ch.ID)
+		s.clearTwoFactorCookie(w)
+		redirect(w, r, "/admin/login")
+		return
+	}
+
+	valid := false
+	if secret, err := cryptoutil.Open(s.cfg.MasterKey, user.TOTPSecret, totpAAD(user.ID)); err == nil {
+		valid = cryptoutil.VerifyTOTP(string(secret), code, time.Now())
+	}
+	if !valid && code != "" {
+		valid, _ = s.db.ConsumeRecoveryCode(r.Context(), user.ID, code)
+		if valid {
+			s.audit(r, "auth.2fa.recovery", user.Username, "recovery code consumed")
+		}
+	}
+	if !valid {
+		attempts, _ := s.db.BumpChallengeAttempts(r.Context(), ch.ID)
+		s.audit(r, "auth.2fa.failed", user.Username, "invalid second factor")
+		if attempts >= store.MaxChallengeAttempts {
+			_ = s.db.DeleteChallenge(r.Context(), ch.ID)
+			s.clearTwoFactorCookie(w)
+			s.renderError(w, r, http.StatusTooManyRequests, "验证尝试次数过多，请重新登录。")
+			return
+		}
+		s.renderError(w, r, http.StatusUnauthorized, "验证码不正确。")
+		return
+	}
+
+	_ = s.db.DeleteChallenge(r.Context(), ch.ID)
+	s.clearTwoFactorCookie(w)
+	if err := s.startSession(w, r, user); err != nil {
+		s.log.Error("failed to create session after 2fa", "error", err)
+		s.renderError(w, r, http.StatusInternalServerError, "会话创建失败。")
+		return
+	}
+	s.guard.reset(strings.ToLower(user.Username))
+	s.audit(r, "auth.login", user.Username, "second factor verified")
+	redirect(w, r, "/admin")
 }

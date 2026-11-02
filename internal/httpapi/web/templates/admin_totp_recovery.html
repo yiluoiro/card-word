@@ -1,0 +1,38 @@
+{{define "admin_totp_recovery"}}{{template "head" .}}
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
+  <div class="page-head">
+    <div class="titles">
+      <h1>恢复码</h1>
+      <div class="sub">两步验证已启用，请立即保存这些一次性恢复码</div>
+    </div>
+  </div>
+
+  <div class="alert warn">
+    {{template "i_alert" .}}
+    <div>这些代码只显示一次。每个只能使用一次，用于在丢失认证器时登录。</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>10 个恢复码</h3>
+      <div class="actions"><button class="btn sm" type="button" data-copy-all="#codes">{{template "i_copy" .}} 复制全部</button></div>
+    </div>
+    <div class="panel-body">
+      <ul class="keys" id="codes">
+        {{range .Codes}}<li><code>{{.}}</code></li>{{end}}
+      </ul>
+      <p class="small muted">建议存放在密码管理器或离线打印件中，不要放在本机明文文件里。</p>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a class="btn primary" href="/admin/account">我已保存，返回账号安全</a>
+  </div>
+</main>
+</div>
+</body>
+</html>{{end}}

@@ -1,0 +1,42 @@
+{{define "admin_totp_setup"}}{{template "head" .}}
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
+  <div class="page-head">
+    <div class="titles">
+      <h1>启用两步验证</h1>
+      <div class="sub">把密钥添加到认证器（Google Authenticator、1Password、Authy 等）</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>第一步 · 添加密钥</h3></div>
+    <div class="panel-body">
+      <p class="small muted">在认证器中手动输入以下密钥（区分大小写可忽略，均为大写）：</p>
+      <pre class="token" style="background:#0d1017">{{.Secret}}</pre>
+      <p class="small muted" style="margin-top:12px">或使用以下 otpauth 链接导入：</p>
+      <pre class="inline-msg" style="word-break:break-all">{{.URI}}</pre>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>第二步 · 验证</h3></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/account/2fa/enable" class="form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>认证器当前显示的 6 位码
+          <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required autofocus>
+        </label>
+        <div class="actions">
+          <button class="btn primary" type="submit">{{template "i_check" .}} 验证并启用</button>
+          <a class="btn ghost" href="/admin/account">取消</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+</div>
+</body>
+</html>{{end}}

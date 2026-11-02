@@ -1,0 +1,23 @@
+{{define "admin_login_2fa"}}{{template "head" .}}
+<body class="auth">
+<main class="auth-card">
+  <div class="auth-brand">
+    <span class="brand-mark">{{template "i_shield" .}}</span>
+    <div>
+      <h1>两步验证</h1>
+      <div class="sub">输入认证器中的 6 位动态码</div>
+    </div>
+  </div>
+  {{if .Error}}<div class="alert err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
+  <form method="post" action="/admin/login/2fa" class="form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label>动态码或恢复码
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" required autofocus>
+      <span class="hint">丢失设备时可使用启用时保存的一次性恢复码</span>
+    </label>
+    <button class="btn primary block lg" type="submit">{{template "i_lock" .}} 验证并登录</button>
+  </form>
+  <div class="auth-foot">{{template "i_shield" .}} 验证码 5 分钟内有效，最多尝试 5 次。</div>
+</main>
+</body>
+</html>{{end}}

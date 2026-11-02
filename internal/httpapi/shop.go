@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -280,13 +282,20 @@ func (s *Server) handleOrderStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) loadOrderForBuyer(w http.ResponseWriter, r *http.Request, orderNo, token string) (*store.Order, []store.CardKey, bool) {
 	ctx := r.Context()
-	if token == "" {
-		s.renderError(w, r, http.StatusForbidden, "缺少查询凭证，请通过订单查询页访问。")
-		return nil, nil, false
+	authorized := false
+	if token != "" {
+		if valid, err := s.db.VerifyOrderQueryToken(ctx, orderNo, token); err == nil && valid {
+			authorized = true
+			// Exchange the long lived link credential for a short lived cookie
+			// so the following navigation no longer carries it in the URL.
+			s.issueOrderCredential(w, orderNo)
+		}
 	}
-	valid, err := s.db.VerifyOrderQueryToken(ctx, orderNo, token)
-	if err != nil || !valid {
-		s.renderError(w, r, http.StatusForbidden, "订单号或查询凭证不正确。")
+	if !authorized && s.orderCredentialValid(r, orderNo) {
+		authorized = true
+	}
+	if !authorized {
+		s.renderError(w, r, http.StatusForbidden, "需要订单查询凭证，请通过订单查询页访问。")
 		return nil, nil, false
 	}
 	order, err := s.db.OrderByNo(ctx, orderNo)
@@ -319,7 +328,61 @@ func (s *Server) handleQuerySubmit(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "请输入订单号与查询凭证。")
 		return
 	}
-	redirect(w, r, "/order/"+orderNo+"?token="+urlEscape(token))
+	valid, err := s.db.VerifyOrderQueryToken(r.Context(), orderNo, token)
+	if err != nil || !valid {
+		s.renderError(w, r, http.StatusForbidden, "订单号或查询凭证不正确，或凭证已过期。")
+		return
+	}
+	s.issueOrderCredential(w, orderNo)
+	redirect(w, r, "/order/"+orderNo)
+}
+
+// orderCredentialTTL bounds the short lived cookie issued after a buyer proves
+// ownership of an order. The query token itself stays out of subsequent URLs.
+const orderCredentialTTL = 30 * time.Minute
+
+const cookieOrderCredential = "cw_ord"
+
+func (s *Server) orderCredentialKey() []byte {
+	return []byte(cryptoutil.HMACSHA256Hex(s.cfg.MasterKey, "order-credential-key"))
+}
+
+func (s *Server) issueOrderCredential(w http.ResponseWriter, orderNo string) {
+	expires := time.Now().Add(orderCredentialTTL).Unix()
+	payload := fmt.Sprintf("%s|%d", orderNo, expires)
+	sig := cryptoutil.HMACSHA256Hex(s.orderCredentialKey(), payload)
+	http.SetCookie(w, &http.Cookie{
+		Name:     s.cookieName(cookieOrderCredential),
+		Value:    url.QueryEscape(payload + "|" + sig),
+		Path:     "/order",
+		MaxAge:   int(orderCredentialTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   s.cfg.Secure(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (s *Server) orderCredentialValid(r *http.Request, orderNo string) bool {
+	c, err := r.Cookie(s.cookieName(cookieOrderCredential))
+	if err != nil || c.Value == "" {
+		return false
+	}
+	raw, err := url.QueryUnescape(c.Value)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(raw, "|")
+	if len(parts) != 3 {
+		return false
+	}
+	expires, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || time.Now().Unix() > expires {
+		return false
+	}
+	if parts[0] != orderNo {
+		return false
+	}
+	return cryptoutil.VerifyHMACSHA256Hex(s.orderCredentialKey(), parts[0]+"|"+parts[1], parts[2])
 }
 
 func (s *Server) handlePay(w http.ResponseWriter, r *http.Request) {

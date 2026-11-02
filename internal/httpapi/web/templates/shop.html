@@ -160,12 +160,12 @@
         <dt>状态</dt><dd>{{statusText .Order.Status}}</dd>
         <dt>支付截止</dt><dd>{{datetime .Order.ExpiresAt}}</dd>
         {{if .Order.PaidAt}}<dt>支付时间</dt><dd>{{datetime .Order.PaidAt}}</dd>{{end}}
-        <dt>查询凭证</dt><dd><span class="mono small">{{.Token}}</span></dd>
+        <dt>访问凭证</dt><dd><span class="small">{{if .Token}}已通过查询凭证校验{{else}}已通过安全会话授权{{end}}</span></dd>
       </dl>
 
       {{if eq .Order.Status "pending"}}
       <div style="margin-top:16px">
-        <a class="btn primary block lg" href="/order/{{.Order.OrderNo}}/pay?token={{.Token}}">{{template "i_bolt" .}} 去支付</a>
+        <a class="btn primary block lg" href="/order/{{.Order.OrderNo}}/pay">{{template "i_bolt" .}} 去支付</a>
         <p class="muted small center" style="margin-top:10px" data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}">正在等待支付结果…</p>
       </div>
       {{end}}
@@ -212,7 +212,7 @@
         <p data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}" class="small">等待确认中…</p>
       {{end}}
 
-      <p style="margin-top:18px"><a class="back" href="/order/{{.Order.OrderNo}}?token={{.Token}}">返回订单详情</a></p>
+      <p style="margin-top:18px"><a class="back" href="/order/{{.Order.OrderNo}}">返回订单详情</a></p>
     </div>
   </div>
 </main>

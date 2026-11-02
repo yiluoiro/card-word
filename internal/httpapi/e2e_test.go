@@ -278,10 +278,21 @@ func TestStorefrontAndAdminFlow(t *testing.T) {
 		t.Fatal("delivered cards are missing from the order page")
 	}
 
-	// Wrong token must not expose anything.
-	resp, _ = h.get("/order/" + orderNo + "?token=wrong")
-	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403 for wrong token, got %d", resp.StatusCode)
+	// A fresh browser (no order cookie) presenting a wrong token must be refused.
+	anonJar, _ := cookiejar.New(nil)
+	anon := &http.Client{
+		Jar: anonJar,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	anonResp, err := anon.Get(h.server.URL + "/order/" + orderNo + "?token=wrong")
+	if err != nil {
+		t.Fatalf("anonymous order request: %v", err)
+	}
+	anonResp.Body.Close()
+	if anonResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for wrong token, got %d", anonResp.StatusCode)
 	}
 
 	// Order status API.

@@ -149,6 +149,8 @@ func (s *Server) routes() {
 	// Admin.
 	s.mux.HandleFunc("GET /admin/login", s.handleLoginForm)
 	s.mux.HandleFunc("POST /admin/login", s.handleLoginSubmit)
+	s.mux.HandleFunc("GET /admin/login/2fa", s.handleLoginTwoFactorForm)
+	s.mux.HandleFunc("POST /admin/login/2fa", s.handleLoginTwoFactorSubmit)
 	s.mux.HandleFunc("POST /admin/logout", s.handleLogout)
 	s.mux.Handle("GET /admin", s.admin(s.handleDashboard))
 	s.mux.Handle("GET /admin/products", s.admin(s.handleAdminProducts))
@@ -186,6 +188,9 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /admin/audit", s.admin(s.handleAdminAudit))
 	s.mux.Handle("GET /admin/account", s.admin(s.handleAdminAccount))
 	s.mux.Handle("POST /admin/account/password", s.admin(s.handleAdminChangePassword))
+	s.mux.Handle("POST /admin/account/2fa/start", s.admin(s.handleTOTPStart))
+	s.mux.Handle("POST /admin/account/2fa/enable", s.admin(s.handleTOTPEnable))
+	s.mux.Handle("POST /admin/account/2fa/disable", s.admin(s.handleTOTPDisable))
 	s.mux.HandleFunc("GET /admin/plugins/{uid}/console", s.handlePluginConsole)
 }
 

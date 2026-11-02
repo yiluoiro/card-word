@@ -282,8 +282,8 @@ func (d *DB) CountOrders(ctx context.Context, f OrderFilter) (int, error) {
 
 // DayStat is one bucket of the sales trend chart.
 type DayStat struct {
-	Date        string
-	Orders      int64
+	Date         string
+	Orders       int64
 	RevenueCents int64
 }
 

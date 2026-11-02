@@ -126,8 +126,49 @@ func (d *DB) migrate(ctx context.Context) error {
 	if _, err := d.write.ExecContext(ctx, string(schema)); err != nil {
 		return fmt.Errorf("store: apply schema: %w", err)
 	}
+	// Existing databases created before the account upgrade need additive
+	// migrations; CREATE TABLE IF NOT EXISTS does not add columns.
+	for _, col := range []struct{ name, ddl string }{
+		{"totp_secret", "totp_secret TEXT NOT NULL DEFAULT ''"},
+		{"totp_enabled", "totp_enabled INTEGER NOT NULL DEFAULT 0"},
+		{"disabled", "disabled INTEGER NOT NULL DEFAULT 0"},
+		{"updated_at", "updated_at INTEGER NOT NULL DEFAULT 0"},
+	} {
+		if err := d.ensureColumn(ctx, "users", col.name, col.ddl); err != nil {
+			return err
+		}
+	}
 	if _, err := d.write.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
 		return fmt.Errorf("store: set user_version: %w", err)
+	}
+	return nil
+}
+
+// ensureColumn adds a column to an existing table when it is missing.
+func (d *DB) ensureColumn(ctx context.Context, table, column, ddl string) error {
+	rows, err := d.write.QueryContext(ctx, "PRAGMA table_info("+table+")")
+	if err != nil {
+		return wrapErr("inspect table "+table, err)
+	}
+	found := false
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, colType string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dflt, &pk); err != nil {
+			rows.Close()
+			return wrapErr("scan table info", err)
+		}
+		if name == column {
+			found = true
+		}
+	}
+	rows.Close()
+	if found {
+		return nil
+	}
+	if _, err := d.write.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN "+ddl); err != nil {
+		return wrapErr("add column "+column, err)
 	}
 	return nil
 }

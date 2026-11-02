@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -85,11 +86,16 @@ func (s *Server) handleAdminAccount(w http.ResponseWriter, r *http.Request) {
 		redirect(w, r, "/admin/login")
 		return
 	}
+	recoveryCount, err := s.db.CountRecoveryCodes(r.Context(), user.ID)
+	if err != nil {
+		s.log.Warn("count recovery codes failed", "error", err)
+	}
 	s.render(w, r, "admin_account", map[string]any{
-		"Title":       "账号安全",
-		"Account":     user,
-		"SessionTTL":  s.cfg.SessionTTL.String(),
-		"SessionIdle": s.cfg.SessionIdle.String(),
+		"Title":         "账号安全",
+		"Account":       user,
+		"SessionTTL":    s.cfg.SessionTTL.String(),
+		"SessionIdle":   s.cfg.SessionIdle.String(),
+		"RecoveryCount": recoveryCount,
 	})
 }
 
@@ -140,4 +146,113 @@ func (s *Server) handleAdminChangePassword(w http.ResponseWriter, r *http.Reques
 	}
 	s.audit(r, "account.password.change", user.Username, "sessions of other devices revoked")
 	flashRedirect(w, r, "/admin/account", "密码已更新，其它设备的会话已失效", "")
+}
+
+// totpAAD binds a sealed TOTP secret to its account.
+func totpAAD(userID int64) string { return fmt.Sprintf("totp:%d", userID) }
+
+// handleTOTPStart provisions a new (not yet enabled) TOTP secret.
+func (s *Server) handleTOTPStart(w http.ResponseWriter, r *http.Request) {
+	user := s.currentUser(r)
+	if user == nil {
+		redirect(w, r, "/admin/login")
+		return
+	}
+	secret, err := cryptoutil.NewTOTPSecret()
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "生成密钥失败。")
+		return
+	}
+	sealed, err := cryptoutil.Seal(s.cfg.MasterKey, []byte(secret), totpAAD(user.ID))
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "保存密钥失败。")
+		return
+	}
+	if err := s.db.SetTOTP(r.Context(), user.ID, sealed, false); err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "保存密钥失败。")
+		return
+	}
+	s.audit(r, "account.2fa.start", user.Username, "secret provisioned, pending verification")
+	s.render(w, r, "admin_totp_setup", map[string]any{
+		"Title":  "启用两步验证",
+		"Secret": secret,
+		"URI":    cryptoutil.TOTPURI(s.setting(store.SettingSiteName, "Card Word"), user.Username, secret),
+	})
+}
+
+// handleTOTPEnable verifies the first code and issues recovery codes.
+func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
+	user := s.currentUser(r)
+	if user == nil {
+		redirect(w, r, "/admin/login")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "表单格式错误。")
+		return
+	}
+	code := r.FormValue("code")
+	secret, err := cryptoutil.Open(s.cfg.MasterKey, user.TOTPSecret, totpAAD(user.ID))
+	if err != nil || !cryptoutil.VerifyTOTP(string(secret), code, time.Now()) {
+		s.audit(r, "account.2fa.enable.failed", user.Username, "invalid verification code")
+		flashRedirect(w, r, "/admin/account", "", "验证码不正确，请确认设备时间已同步后重试。")
+		return
+	}
+	if err := s.db.SetTOTP(r.Context(), user.ID, user.TOTPSecret, true); err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "启用失败。")
+		return
+	}
+	codes, err := cryptoutil.NewRecoveryCodes(10)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "生成恢复码失败。")
+		return
+	}
+	if err := s.db.ReplaceRecoveryCodes(r.Context(), user.ID, codes); err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "保存恢复码失败。")
+		return
+	}
+	s.audit(r, "account.2fa.enable", user.Username, "totp enabled, 10 recovery codes issued")
+	s.render(w, r, "admin_totp_recovery", map[string]any{
+		"Title": "恢复码",
+		"Codes": codes,
+	})
+}
+
+// handleTOTPDisable turns 2FA off, requiring password and a valid factor.
+func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
+	user := s.currentUser(r)
+	if user == nil {
+		redirect(w, r, "/admin/login")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "表单格式错误。")
+		return
+	}
+	ok, err := cryptoutil.VerifyPassword(user.PasswordHash, r.FormValue("password"))
+	if err != nil || !ok {
+		s.audit(r, "account.2fa.disable.failed", user.Username, "wrong password")
+		flashRedirect(w, r, "/admin/account", "", "密码不正确。")
+		return
+	}
+	code := r.FormValue("code")
+	valid := false
+	if secret, err := cryptoutil.Open(s.cfg.MasterKey, user.TOTPSecret, totpAAD(user.ID)); err == nil {
+		valid = cryptoutil.VerifyTOTP(string(secret), code, time.Now())
+	}
+	if !valid {
+		valid, _ = s.db.ConsumeRecoveryCode(r.Context(), user.ID, code)
+	}
+	if !valid {
+		s.audit(r, "account.2fa.disable.failed", user.Username, "invalid factor")
+		flashRedirect(w, r, "/admin/account", "", "验证码或恢复码不正确。")
+		return
+	}
+	if err := s.db.ClearTOTP(r.Context(), user.ID); err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "关闭失败。")
+		return
+	}
+	_ = s.db.ReplaceRecoveryCodes(r.Context(), user.ID, nil)
+	s.audit(r, "account.2fa.disable", user.Username, "totp disabled")
+	flashRedirect(w, r, "/admin/account", "两步验证已关闭", "")
 }

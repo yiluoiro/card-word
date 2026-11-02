@@ -45,6 +45,32 @@
   </div>
 
   <div class="panel">
+    <div class="panel-head">
+      <h3>两步验证（TOTP）</h3>
+      {{if .Account.TOTPEnabled}}<span class="badge ok"><span class="dot"></span>已启用</span>{{else}}<span class="badge warn">未启用</span>{{end}}
+    </div>
+    <div class="panel-body">
+      {{if .Account.TOTPEnabled}}
+        <p class="small muted">登录需要密码 + 认证器动态码。当前剩余恢复码 <strong>{{.RecoveryCount}}</strong> 个。</p>
+        <form method="post" action="/admin/account/2fa/disable" class="form" style="margin-top:14px">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <div class="row">
+            <label>当前密码<input type="password" name="password" autocomplete="current-password" required></label>
+            <label>动态码或恢复码<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+          </div>
+          <div class="actions"><button class="btn danger" type="submit">关闭两步验证</button></div>
+        </form>
+      {{else}}
+        <p class="small muted">启用后，即使密码泄露，攻击者也无法登录后台。需要一个支持 TOTP 的认证器应用。</p>
+        <form method="post" action="/admin/account/2fa/start" style="margin-top:14px">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <button class="btn primary" type="submit">{{template "i_shield" .}} 启用两步验证</button>
+        </form>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="panel">
     <div class="panel-head"><h3>安全建议</h3></div>
     <div class="panel-body">
       <ul class="checklist">
