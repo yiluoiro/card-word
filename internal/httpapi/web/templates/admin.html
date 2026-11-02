@@ -1,202 +1,298 @@
 {{define "admin_dashboard"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <h2 class="page-title">概览</h2>
+  <div class="page-head">
+    <div class="titles">
+      <h1>概览</h1>
+      <div class="sub">今日经营数据与库存健康度</div>
+    </div>
+    <div class="actions">
+      <a class="btn sm" href="/admin/orders?status=pending">{{template "i_receipt" .}} 待支付订单</a>
+      <a class="btn primary sm" href="/admin/products/0">{{template "i_plus" .}} 新建商品</a>
+    </div>
+  </div>
+
   <div class="stats">
-    <div class="stat"><span class="stat-label">今日订单</span><strong>{{.Stats.TodayOrders}}</strong></div>
-    <div class="stat"><span class="stat-label">今日收入</span><strong>{{money .Stats.TodayRevenue .Currency}}</strong></div>
-    <div class="stat"><span class="stat-label">累计收入</span><strong>{{money .Stats.RevenueCents .Currency}}</strong></div>
-    <div class="stat"><span class="stat-label">已支付订单</span><strong>{{.Stats.PaidOrders}} / {{.Stats.TotalOrders}}</strong></div>
-    <div class="stat"><span class="stat-label">待支付</span><strong>{{.Stats.PendingOrders}}</strong></div>
-    <div class="stat"><span class="stat-label">已启用插件</span><strong>{{.PluginCount}}</strong></div>
+    <div class="stat">
+      <div class="label">{{template "i_receipt" .}} 今日订单</div>
+      <div class="value">{{.Stats.TodayOrders}}</div>
+      <div class="delta">累计 {{.Stats.TotalOrders}} 单</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{template "i_bolt" .}} 今日收入</div>
+      <div class="value">{{money .Stats.TodayRevenue .Currency}}</div>
+      <div class="delta">累计 {{money .Stats.RevenueCents .Currency}}</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{template "i_check" .}} 已支付订单</div>
+      <div class="value">{{.Stats.PaidOrders}}</div>
+      <div class="delta">支付率 {{pct .Stats.PaidOrders .Stats.TotalOrders}}%</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{template "i_refresh" .}} 待支付</div>
+      <div class="value">{{.Stats.PendingOrders}}</div>
+      <div class="delta">超时自动关闭</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{template "i_puzzle" .}} 已启用插件</div>
+      <div class="value">{{.PluginCount}}</div>
+      <div class="delta"><a href="/admin/plugins">管理应用商城</a></div>
+    </div>
   </div>
 
   {{if .LowStock}}
   <div class="alert warn">
-    库存不足提醒：{{range .LowStock}}<a href="/admin/products/{{.ID}}/cards">{{.Name}}({{.Stock}})</a> {{end}}
+    {{template "i_alert" .}}
+    <div>库存不足：{{range $i, $p := .LowStock}}{{if $i}}、{{end}}<a href="/admin/products/{{$p.ID}}/cards">{{$p.Name}}（{{$p.Stock}}）</a>{{end}}</div>
   </div>
   {{end}}
 
   <div class="panel">
-    <div class="panel-head"><h3>最近订单</h3><a class="btn sm ghost" href="/admin/orders">全部订单</a></div>
-    <table class="table">
-      <thead><tr><th>订单号</th><th>商品</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
-      <tbody>
-      {{range .Orders}}
-        <tr>
-          <td><a href="/admin/orders/{{.OrderNo}}" class="mono">{{.OrderNo}}</a></td>
-          <td>{{.ProductName}} × {{.Quantity}}</td>
-          <td>{{money .TotalCents .Currency}}</td>
-          <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-          <td class="muted small">{{datetime .CreatedAt}}</td>
-        </tr>
-      {{else}}
-        <tr><td colspan="5" class="muted">暂无订单</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-head">
+      <h3>最近订单</h3>
+      <div class="actions"><a class="btn ghost sm" href="/admin/orders">全部订单 {{template "i_arrow_right" .}}</a></div>
+    </div>
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>状态</th><th>下单时间</th></tr></thead>
+          <tbody>
+          {{range .Orders}}
+            <tr>
+              <td><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
+              <td><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
+              <td class="num">{{money .TotalCents .Currency}}</td>
+              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="secondary-cell">{{datetime .CreatedAt}}</td>
+            </tr>
+          {{else}}
+            <tr><td colspan="5" class="muted">还没有订单，前台下单后会出现在这里。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_products"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <div class="panel-head">
-    <h2 class="page-title">商品管理</h2>
-    <a class="btn primary sm" href="/admin/products/0">新建商品</a>
+  <div class="page-head">
+    <div class="titles">
+      <h1>商品</h1>
+      <div class="sub">共 {{len .Products}} 个商品 · 库存实时统计</div>
+    </div>
+    <div class="actions"><a class="btn primary sm" href="/admin/products/0">{{template "i_plus" .}} 新建商品</a></div>
   </div>
+
   <form class="toolbar" method="get" action="/admin/products">
-    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称">
-    <button class="btn sm" type="submit">搜索</button>
+    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或别名">
+    <button class="btn sm" type="submit">{{template "i_search" .}} 搜索</button>
   </form>
+
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>商品</th><th>分类</th><th>价格</th><th>库存</th><th>状态</th><th>操作</th></tr></thead>
-      <tbody>
-      {{range .Products}}
-        <tr>
-          <td><strong>{{.Name}}</strong><br><span class="muted small mono">/p/{{.Slug}}</span></td>
-          <td>{{if .CategoryName}}{{.CategoryName}}{{else}}-{{end}}</td>
-          <td>{{money .PriceCents .Currency}}</td>
-          <td>{{if gt .Stock 0}}<span class="badge ok">{{.Stock}}</span>{{else}}<span class="badge muted">0</span>{{end}}</td>
-          <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-          <td class="actions">
-            <a class="btn sm" href="/admin/products/{{.ID}}">编辑</a>
-            <a class="btn sm" href="/admin/products/{{.ID}}/cards">卡密</a>
-            <form method="post" action="/admin/products/{{.ID}}/delete" class="inline" data-confirm="确认删除该商品及其全部卡密？">
-              <input type="hidden" name="csrf" value="{{$.CSRF}}">
-              <button class="btn sm danger" type="submit">删除</button>
-            </form>
-          </td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="muted">还没有商品，点击右上角新建。</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>商品</th><th>分类</th><th class="num">价格</th><th class="num">库存</th><th>状态</th><th class="num">操作</th></tr></thead>
+          <tbody>
+          {{range .Products}}
+            <tr>
+              <td>
+                <div class="primary-cell">{{.Name}}</div>
+                <div class="secondary-cell mono">/p/{{.Slug}}</div>
+              </td>
+              <td class="secondary-cell">{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
+              <td class="num">{{money .PriceCents .Currency}}</td>
+              <td class="num">{{if gt .Stock 0}}<span class="badge ok">{{.Stock}}</span>{{else}}<span class="badge muted">0</span>{{end}}</td>
+              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="actions">
+                <a class="btn sm" href="/admin/products/{{.ID}}">编辑</a>
+                <a class="btn sm" href="/admin/products/{{.ID}}/cards">{{template "i_key" .}} 卡密</a>
+                <form method="post" action="/admin/products/{{.ID}}/delete" class="inline" data-confirm="删除商品会同时删除其全部卡密，确认继续？">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                  <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
+                </form>
+              </td>
+            </tr>
+          {{else}}
+            <tr><td colspan="6" class="muted">还没有商品，点击右上角「新建商品」开始。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_product_form"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container narrow">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
   {{template "flash" .}}
-  <h2 class="page-title">{{if .Product}}编辑商品{{else}}新建商品{{end}}</h2>
+  <a class="back" href="/admin/products">{{template "i_arrow_left" .}} 返回商品列表</a>
+  <div class="page-head">
+    <div class="titles">
+      <h1>{{if .Product}}编辑商品{{else}}新建商品{{end}}</h1>
+      <div class="sub">{{if .Product}}别名 /p/{{.Product.Slug}}{{else}}保存后即可导入卡密{{end}}</div>
+    </div>
+  </div>
+
   <div class="panel">
-    <form method="post" action="/admin/products" class="form">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      {{if .Product}}<input type="hidden" name="id" value="{{.Product.ID}}">{{end}}
-      <label>商品名称<input type="text" name="name" value="{{if .Product}}{{.Product.Name}}{{end}}" required></label>
-      <label>访问别名（留空自动生成）<input type="text" name="slug" value="{{if .Product}}{{.Product.Slug}}{{end}}" placeholder="demo-card"></label>
-      <label>分类
-        <select name="category_id">
-          <option value="0">未分类</option>
-          {{range .Categories}}<option value="{{.ID}}" {{if and $.Product (eq $.Product.CategoryID.Int64 .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
-        </select>
-      </label>
-      <div class="row">
-        <label>价格(元)<input type="text" name="price" value="{{if .Product}}{{moneyShort .Product.PriceCents}}{{end}}" placeholder="9.90" required></label>
-        <label>货币<input type="text" name="currency" value="{{if .Product}}{{.Product.Currency}}{{else}}CNY{{end}}"></label>
-      </div>
-      <div class="row">
-        <label>最少购买<input type="number" name="min_qty" value="{{if .Product}}{{.Product.MinQty}}{{else}}1{{end}}" min="1"></label>
-        <label>最多购买<input type="number" name="max_qty" value="{{if .Product}}{{.Product.MaxQty}}{{else}}10{{end}}" min="1"></label>
-        <label>排序<input type="number" name="sort" value="{{if .Product}}{{.Product.Sort}}{{else}}0{{end}}"></label>
-      </div>
-      <label>状态
-        <select name="status">
-          <option value="active" {{if and .Product (eq .Product.Status "active")}}selected{{end}}>上架</option>
-          <option value="draft" {{if and .Product (eq .Product.Status "draft")}}selected{{end}}>草稿</option>
-          <option value="archived" {{if and .Product (eq .Product.Status "archived")}}selected{{end}}>归档</option>
-        </select>
-      </label>
-      <label>简介<input type="text" name="summary" value="{{if .Product}}{{.Product.Summary}}{{end}}"></label>
-      <label>详细描述<textarea name="description" rows="6">{{if .Product}}{{.Product.Description}}{{end}}</textarea></label>
-      <button class="btn primary" type="submit">保存</button>
-      <a class="btn ghost" href="/admin/products">取消</a>
-    </form>
+    <div class="panel-body">
+      <form method="post" action="/admin/products" class="form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        {{if .Product}}<input type="hidden" name="id" value="{{.Product.ID}}">{{end}}
+
+        <label>商品名称<input type="text" name="name" value="{{if .Product}}{{.Product.Name}}{{end}}" required autofocus></label>
+        <div class="row">
+          <label>访问别名<span class="hint">留空自动生成</span><input type="text" name="slug" value="{{if .Product}}{{.Product.Slug}}{{end}}" placeholder="demo-card"></label>
+          <label>分类
+            <select name="category_id">
+              <option value="0">未分类</option>
+              {{range .Categories}}<option value="{{.ID}}" {{if and $.Product (eq $.Product.CategoryID.Int64 .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>价格（元）<input type="text" name="price" value="{{if .Product}}{{moneyShort .Product.PriceCents}}{{end}}" placeholder="9.90" required></label>
+          <label>货币<input type="text" name="currency" value="{{if .Product}}{{.Product.Currency}}{{else}}CNY{{end}}"></label>
+          <label>状态
+            <select name="status">
+              <option value="active" {{if and .Product (eq .Product.Status "active")}}selected{{end}}>上架</option>
+              <option value="draft" {{if and .Product (eq .Product.Status "draft")}}selected{{end}}>草稿</option>
+              <option value="archived" {{if and .Product (eq .Product.Status "archived")}}selected{{end}}>归档</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>最少购买<input type="number" name="min_qty" value="{{if .Product}}{{.Product.MinQty}}{{else}}1{{end}}" min="1"></label>
+          <label>最多购买<input type="number" name="max_qty" value="{{if .Product}}{{.Product.MaxQty}}{{else}}10{{end}}" min="1"></label>
+          <label>排序权重<input type="number" name="sort" value="{{if .Product}}{{.Product.Sort}}{{else}}0{{end}}"></label>
+        </div>
+        <label>一句话简介<input type="text" name="summary" value="{{if .Product}}{{.Product.Summary}}{{end}}" placeholder="展示在商品卡片上"></label>
+        <label>详细说明<textarea name="description" rows="7">{{if .Product}}{{.Product.Description}}{{end}}</textarea></label>
+
+        <div class="actions">
+          <button class="btn primary" type="submit">保存商品</button>
+          <a class="btn ghost" href="/admin/products">取消</a>
+        </div>
+      </form>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_cards"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <div class="panel-head">
-    <h2 class="page-title">{{.Product.Name}} · 卡密</h2>
-    <span class="badge ok">当前库存 {{.Stock}}</span>
-  </div>
-  <div class="panel">
-    <form method="post" action="/admin/products/{{.Product.ID}}/cards" class="form">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>批量导入卡密（每行一条，自动去重，加密存储）
-        <textarea name="secrets" rows="6" placeholder="CARD-0001&#10;CARD-0002"></textarea>
-      </label>
-      <label>备注标签<input type="text" name="label" placeholder="例如：2026-11 批次"></label>
-      <button class="btn primary" type="submit">导入</button>
-    </form>
-  </div>
-
-  <div class="toolbar">
-    <a class="btn sm {{if eq .Status ""}}primary{{end}}" href="/admin/products/{{.Product.ID}}/cards">全部</a>
-    <a class="btn sm {{if eq .Status "available"}}primary{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=available">可售</a>
-    <a class="btn sm {{if eq .Status "sold"}}primary{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=sold">已售</a>
-    <a class="btn sm {{if eq .Status "disabled"}}primary{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=disabled">已停用</a>
+  <a class="back" href="/admin/products">{{template "i_arrow_left" .}} 返回商品列表</a>
+  <div class="page-head">
+    <div class="titles">
+      <h1>{{.Product.Name}} · 卡密</h1>
+      <div class="sub">卡密以 AES-256-GCM 加密存储，仅在发货或手动查看时解密</div>
+    </div>
+    <div class="actions"><span class="badge ok"><span class="dot"></span>可售 {{.Stock}}</span></div>
   </div>
 
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>ID</th><th>卡密</th><th>标签</th><th>状态</th><th>售出时间</th><th>操作</th></tr></thead>
-      <tbody>
-      {{range .Cards}}
-        <tr>
-          <td class="mono">{{.ID}}</td>
-          <td class="mono">{{.Masked}}</td>
-          <td>{{if .Label}}{{.Label}}{{else}}-{{end}}</td>
-          <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-          <td class="muted small">{{if .SoldAt}}{{datetime .SoldAt}}{{else}}-{{end}}</td>
-          <td class="actions">
-            <button class="btn sm" type="button" data-reveal="{{.ID}}">查看</button>
-            {{if eq .Status "available"}}
-            <form method="post" action="/admin/cards/{{.ID}}/disable" class="inline" data-confirm="确认停用该卡密？">
-              <input type="hidden" name="csrf" value="{{$.CSRF}}">
-              <button class="btn sm danger" type="submit">停用</button>
-            </form>
-            {{end}}
-          </td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="muted">暂无卡密</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-head"><h3>批量导入</h3><span class="panel-sub">每行一条，自动去重</span></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/products/{{.Product.ID}}/cards" class="form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>卡密列表
+          <textarea name="secrets" rows="6" placeholder="CARD-0001&#10;CARD-0002"></textarea>
+        </label>
+        <div class="row">
+          <label>批次标签<span class="hint">可选，便于追溯来源</span><input type="text" name="label" placeholder="2026-11 批次"></label>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn primary" type="submit">{{template "i_upload" .}} 导入卡密</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="chips">
+    <a class="chip {{if eq .Status ""}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards">全部</a>
+    <a class="chip {{if eq .Status "available"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=available">可售</a>
+    <a class="chip {{if eq .Status "sold"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=sold">已售</a>
+    <a class="chip {{if eq .Status "disabled"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=disabled">已停用</a>
+  </div>
+
+  <div class="panel">
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>ID</th><th>卡密</th><th>标签</th><th>状态</th><th>售出时间</th><th class="num">操作</th></tr></thead>
+          <tbody>
+          {{range .Cards}}
+            <tr>
+              <td class="mono secondary-cell">{{.ID}}</td>
+              <td class="mono">{{.Masked}}</td>
+              <td class="secondary-cell">{{if .Label}}{{.Label}}{{else}}—{{end}}</td>
+              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="secondary-cell">{{if .SoldAt}}{{datetime .SoldAt}}{{else}}—{{end}}</td>
+              <td class="actions">
+                <button class="btn sm" type="button" data-reveal="{{.ID}}">{{template "i_eye" .}} 查看</button>
+                {{if eq .Status "available"}}
+                <form method="post" action="/admin/cards/{{.ID}}/disable" class="inline" data-confirm="停用后该卡密不再参与发货，确认？">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                  <button class="btn sm danger" type="submit">停用</button>
+                </form>
+                {{end}}
+              </td>
+            </tr>
+          {{else}}
+            <tr><td colspan="6" class="muted">暂无卡密，先在上方导入。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_orders"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <h2 class="page-title">订单管理</h2>
+  <div class="page-head">
+    <div class="titles">
+      <h1>订单</h1>
+      <div class="sub">支付回调与人工确认都走同一条发货通道</div>
+    </div>
+  </div>
+
   <form class="toolbar" method="get" action="/admin/orders">
     <input type="search" name="q" value="{{.Search}}" placeholder="订单号 / 邮箱 / 商品">
     <select name="status">
@@ -207,209 +303,265 @@
       <option value="closed" {{if eq .Status "closed"}}selected{{end}}>已关闭</option>
       <option value="refunded" {{if eq .Status "refunded"}}selected{{end}}>已退款</option>
     </select>
-    <button class="btn sm" type="submit">筛选</button>
+    <button class="btn sm" type="submit">{{template "i_search" .}} 筛选</button>
   </form>
+
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>订单号</th><th>商品</th><th>金额</th><th>买家</th><th>状态</th><th>时间</th></tr></thead>
-      <tbody>
-      {{range .Orders}}
-        <tr>
-          <td><a href="/admin/orders/{{.OrderNo}}" class="mono">{{.OrderNo}}</a></td>
-          <td>{{.ProductName}} × {{.Quantity}}</td>
-          <td>{{money .TotalCents .Currency}}</td>
-          <td class="small">{{if .Email}}{{maskEmail .Email}}{{else}}-{{end}}</td>
-          <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-          <td class="muted small">{{datetime .CreatedAt}}</td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="muted">没有符合条件的订单</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>买家</th><th>状态</th><th>时间</th></tr></thead>
+          <tbody>
+          {{range .Orders}}
+            <tr>
+              <td><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
+              <td><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
+              <td class="num">{{money .TotalCents .Currency}}</td>
+              <td class="secondary-cell">{{if .Email}}{{maskEmail .Email}}{{else}}—{{end}}</td>
+              <td><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
+              <td class="secondary-cell">{{datetime .CreatedAt}}</td>
+            </tr>
+          {{else}}
+            <tr><td colspan="6" class="muted">没有符合条件的订单。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_order"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container narrow">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
   {{template "flash" .}}
-  <a class="back" href="/admin/orders">← 返回订单列表</a>
+  <a class="back" href="/admin/orders">{{template "i_arrow_left" .}} 返回订单列表</a>
+
   <div class="panel">
     <div class="panel-head">
-      <h2 class="mono">{{.Order.OrderNo}}</h2>
+      <div>
+        <h2 class="mono" style="font-size:15px">{{.Order.OrderNo}}</h2>
+        <div class="panel-sub">{{datetime .Order.CreatedAt}} · {{.Order.PaymentDriver}}</div>
+      </div>
       <span class="badge {{statusClass .Order.Status}}">{{statusText .Order.Status}}</span>
     </div>
-    <dl class="kv">
-      <dt>商品</dt><dd>{{.Order.ProductName}} × {{.Order.Quantity}}</dd>
-      <dt>单价</dt><dd>{{money .Order.UnitPriceCents .Order.Currency}}</dd>
-      <dt>小计</dt><dd>{{money .Order.SubtotalCents .Order.Currency}}</dd>
-      <dt>优惠</dt><dd>{{money .Order.DiscountCents .Order.Currency}}{{if .Order.CouponCode}} <span class="mono small">{{.Order.CouponCode}}</span>{{end}}</dd>
-      <dt>应付</dt><dd><strong>{{money .Order.TotalCents .Order.Currency}}</strong></dd>
-      <dt>邮箱</dt><dd>{{if .Order.Email}}{{.Order.Email}}{{else}}-{{end}}</dd>
-      <dt>联系方式</dt><dd>{{if .Order.Contact}}{{.Order.Contact}}{{else}}-{{end}}</dd>
-      <dt>支付方式</dt><dd>{{.Order.PaymentDriver}}{{if .Order.PaymentTxn}} · <span class="mono small">{{.Order.PaymentTxn}}</span>{{end}}</dd>
-      <dt>创建 / 过期</dt><dd>{{datetime .Order.CreatedAt}} → {{datetime .Order.ExpiresAt}}</dd>
-      <dt>支付时间</dt><dd>{{if .Order.PaidAt}}{{datetime .Order.PaidAt}}{{else}}-{{end}}</dd>
-      <dt>发货时间</dt><dd>{{if .Order.DeliveredAt}}{{datetime .Order.DeliveredAt}}{{else}}-{{end}}</dd>
-      {{if .Order.Note}}<dt>备注</dt><dd>{{.Order.Note}}</dd>{{end}}
-    </dl>
+    <div class="panel-body">
+      <dl class="kv">
+        <dt>商品</dt><dd>{{.Order.ProductName}} × {{.Order.Quantity}}</dd>
+        <dt>单价 / 小计</dt><dd>{{money .Order.UnitPriceCents .Order.Currency}} / {{money .Order.SubtotalCents .Order.Currency}}</dd>
+        <dt>优惠</dt><dd>{{money .Order.DiscountCents .Order.Currency}}{{if .Order.CouponCode}} <span class="badge accent">{{.Order.CouponCode}}</span>{{end}}</dd>
+        <dt>应付金额</dt><dd><strong>{{money .Order.TotalCents .Order.Currency}}</strong></dd>
+        <dt>买家邮箱</dt><dd>{{if .Order.Email}}{{.Order.Email}}{{else}}—{{end}}</dd>
+        <dt>联系方式</dt><dd>{{if .Order.Contact}}{{.Order.Contact}}{{else}}—{{end}}</dd>
+        <dt>支付流水</dt><dd class="mono small">{{if .Order.PaymentTxn}}{{.Order.PaymentTxn}}{{else}}—{{end}}</dd>
+        <dt>时间线</dt><dd class="small">创建 {{datetime .Order.CreatedAt}} · 过期 {{datetime .Order.ExpiresAt}}{{if .Order.PaidAt}} · 支付 {{datetime .Order.PaidAt}}{{end}}{{if .Order.DeliveredAt}} · 发货 {{datetime .Order.DeliveredAt}}{{end}}</dd>
+        {{if .Order.Note}}<dt>备注</dt><dd>{{.Order.Note}}</dd>{{end}}
+      </dl>
 
-    <div class="actions wrap">
-      {{if eq .Order.Status "pending"}}
-      <form method="post" action="/admin/orders/{{.Order.OrderNo}}/fulfill" class="inline" data-confirm="确认已收到款项并发货？">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <button class="btn primary sm" type="submit">确认收款并发货</button>
-      </form>
-      <form method="post" action="/admin/orders/{{.Order.OrderNo}}/close" class="inline" data-confirm="关闭该订单？">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <button class="btn sm" type="submit">关闭订单</button>
-      </form>
-      {{end}}
-      {{if eq .Order.Status "paid"}}
-      <form method="post" action="/admin/orders/{{.Order.OrderNo}}/retry" class="inline">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <button class="btn primary sm" type="submit">补发卡密</button>
-      </form>
-      {{end}}
-      {{if or (eq .Order.Status "delivered") (eq .Order.Status "paid")}}
-      <form method="post" action="/admin/orders/{{.Order.OrderNo}}/refund" class="inline" data-confirm="标记为已退款？">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <button class="btn sm danger" type="submit">标记退款</button>
-      </form>
-      {{end}}
+      <div class="actions wrap" style="margin-top:16px">
+        {{if eq .Order.Status "pending"}}
+        <form method="post" action="/admin/orders/{{.Order.OrderNo}}/fulfill" class="inline" data-confirm="确认已收到款项并立即发货？">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <button class="btn primary sm" type="submit">{{template "i_check" .}} 确认收款并发货</button>
+        </form>
+        <form method="post" action="/admin/orders/{{.Order.OrderNo}}/close" class="inline" data-confirm="关闭该订单？买家将无法继续支付。">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <button class="btn sm" type="submit">关闭订单</button>
+        </form>
+        {{end}}
+        {{if eq .Order.Status "paid"}}
+        <form method="post" action="/admin/orders/{{.Order.OrderNo}}/retry" class="inline">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <button class="btn primary sm" type="submit">{{template "i_refresh" .}} 补发卡密</button>
+        </form>
+        {{end}}
+        {{if or (eq .Order.Status "delivered") (eq .Order.Status "paid")}}
+        <form method="post" action="/admin/orders/{{.Order.OrderNo}}/refund" class="inline" data-confirm="仅标记为已退款，不会自动回滚卡密。">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <button class="btn sm danger" type="submit">标记退款</button>
+        </form>
+        {{end}}
+      </div>
     </div>
   </div>
 
   {{if .Cards}}
   <div class="panel">
-    <h3>已发卡密</h3>
-    <ul class="keys">{{range .Cards}}<li><code>{{.Secret}}</code></li>{{end}}</ul>
+    <div class="panel-head"><h3>已发卡密</h3><div class="actions"><button class="btn sm" type="button" data-copy-all="#admin-keys">{{template "i_copy" .}} 复制全部</button></div></div>
+    <div class="panel-body">
+      <ul class="keys" id="admin-keys">{{range .Cards}}<li><code>{{.Secret}}</code></li>{{end}}</ul>
+    </div>
   </div>
   {{end}}
 
   {{if .Payments}}
   <div class="panel">
-    <h3>支付记录</h3>
-    <table class="table">
-      <thead><tr><th>渠道</th><th>交易号</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
-      <tbody>
-      {{range .Payments}}
-        <tr><td>{{.Driver}}</td><td class="mono small">{{.TxnID}}</td><td>{{money .AmountCents $.Currency}}</td><td>{{.Status}}</td><td class="muted small">{{datetime .CreatedAt}}</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-head"><h3>支付记录</h3></div>
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>渠道</th><th>交易号</th><th class="num">金额</th><th>状态</th><th>时间</th></tr></thead>
+          <tbody>
+          {{range .Payments}}
+            <tr>
+              <td>{{.Driver}}</td>
+              <td class="mono small">{{if .TxnID}}{{.TxnID}}{{else}}—{{end}}</td>
+              <td class="num">{{money .AmountCents $.Currency}}</td>
+              <td><span class="badge info">{{.Status}}</span></td>
+              <td class="secondary-cell">{{datetime .CreatedAt}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
   {{end}}
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_coupons"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <h2 class="page-title">优惠码</h2>
-  <div class="panel">
-    <form method="post" action="/admin/coupons" class="form grid-form">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>优惠码<input type="text" name="code" placeholder="SAVE10" required></label>
-      <label>类型
-        <select name="kind">
-          <option value="percent">百分比折扣</option>
-          <option value="fixed">固定金额减免</option>
-        </select>
-      </label>
-      <label>百分比(1-100)<input type="number" name="percent" min="1" max="100" placeholder="10"></label>
-      <label>固定金额(元)<input type="text" name="amount" placeholder="5.00"></label>
-      <label>最低消费(元)<input type="text" name="min_total" placeholder="0"></label>
-      <label>最大使用次数(0=不限)<input type="number" name="max_uses" value="0" min="0"></label>
-      <label>限定商品
-        <select name="product_id">
-          <option value="0">全部商品</option>
-          {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
-        </select>
-      </label>
-      <label>过期日期<input type="date" name="expires_at"></label>
-      <button class="btn primary" type="submit">创建优惠码</button>
-    </form>
+  <div class="page-head">
+    <div class="titles">
+      <h1>优惠码</h1>
+      <div class="sub">支持百分比与固定金额，可限制次数、最低消费、指定商品与有效期</div>
+    </div>
   </div>
 
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>优惠码</th><th>类型</th><th>折扣</th><th>已用</th><th>状态</th><th>操作</th></tr></thead>
-      <tbody>
-      {{range .Coupons}}
-        <tr>
-          <td class="mono">{{.Code}}</td>
-          <td>{{if eq .Kind "percent"}}百分比{{else}}固定金额{{end}}</td>
-          <td>{{if eq .Kind "percent"}}{{.Value}}%{{else}}{{money .Value "CNY"}}{{end}}</td>
-          <td>{{.UsedCount}}{{if gt .MaxUses 0}} / {{.MaxUses}}{{end}}</td>
-          <td>{{if .Active}}<span class="badge ok">启用</span>{{else}}<span class="badge muted">停用</span>{{end}}{{if .ExpiresAt}} <span class="muted small">{{date .ExpiresAt}}</span>{{end}}</td>
-          <td>
-            <form method="post" action="/admin/coupons/{{.ID}}/delete" class="inline" data-confirm="删除该优惠码？">
-              <input type="hidden" name="csrf" value="{{$.CSRF}}">
-              <button class="btn sm danger" type="submit">删除</button>
-            </form>
-          </td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="muted">暂无优惠码</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-head"><h3>创建优惠码</h3></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/coupons" class="grid-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>优惠码<input type="text" name="code" placeholder="SAVE10" required></label>
+        <label>类型
+          <select name="kind">
+            <option value="percent">百分比折扣</option>
+            <option value="fixed">固定金额减免</option>
+          </select>
+        </label>
+        <label>百分比<input type="number" name="percent" min="1" max="100" placeholder="10"></label>
+        <label>固定金额（元）<input type="text" name="amount" placeholder="5.00"></label>
+        <label>最低消费（元）<input type="text" name="min_total" placeholder="0"></label>
+        <label>最大次数<span class="hint">0 表示不限</span><input type="number" name="max_uses" value="0" min="0"></label>
+        <label>限定商品
+          <select name="product_id">
+            <option value="0">全部商品</option>
+            {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+          </select>
+        </label>
+        <label>过期日期<input type="date" name="expires_at"></label>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 创建</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>优惠码</th><th>类型</th><th class="num">折扣</th><th class="num">已用</th><th>状态</th><th class="num">操作</th></tr></thead>
+          <tbody>
+          {{range .Coupons}}
+            <tr>
+              <td class="mono">{{.Code}}</td>
+              <td class="secondary-cell">{{if eq .Kind "percent"}}百分比{{else}}固定金额{{end}}</td>
+              <td class="num">{{if eq .Kind "percent"}}{{.Value}}%{{else}}{{money .Value "CNY"}}{{end}}</td>
+              <td class="num">{{.UsedCount}}{{if gt .MaxUses 0}} / {{.MaxUses}}{{end}}</td>
+              <td>
+                {{if .Active}}<span class="badge ok">启用</span>{{else}}<span class="badge muted">停用</span>{{end}}
+                {{if .ExpiresAt}}<span class="secondary-cell"> {{date .ExpiresAt}}</span>{{end}}
+              </td>
+              <td class="actions">
+                <form method="post" action="/admin/coupons/{{.ID}}/delete" class="inline" data-confirm="删除该优惠码？">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                  <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
+                </form>
+              </td>
+            </tr>
+          {{else}}
+            <tr><td colspan="6" class="muted">暂无优惠码。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_categories"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container narrow">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
   {{template "flash" .}}
-  <h2 class="page-title">分类管理</h2>
-  <div class="panel">
-    <form method="post" action="/admin/categories" class="form row-form">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>名称<input type="text" name="name" required></label>
-      <label>别名<input type="text" name="slug" placeholder="auto"></label>
-      <label>排序<input type="number" name="sort" value="0"></label>
-      <label class="checkbox"><input type="checkbox" name="visible" value="1" checked><span>前台可见</span></label>
-      <button class="btn primary" type="submit">新增分类</button>
-    </form>
+  <div class="page-head">
+    <div class="titles">
+      <h1>分类</h1>
+      <div class="sub">用于前台商品分组展示</div>
+    </div>
   </div>
+
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>名称</th><th>别名</th><th>排序</th><th>可见</th><th>操作</th></tr></thead>
-      <tbody>
-      {{range .Categories}}
-        <tr>
-          <td>{{.Name}}</td>
-          <td class="mono small">{{.Slug}}</td>
-          <td>{{.Sort}}</td>
-          <td>{{if .Visible}}<span class="badge ok">是</span>{{else}}<span class="badge muted">否</span>{{end}}</td>
-          <td>
-            <form method="post" action="/admin/categories/{{.ID}}/delete" class="inline" data-confirm="删除该分类？商品会变为未分类。">
-              <input type="hidden" name="csrf" value="{{$.CSRF}}">
-              <button class="btn sm danger" type="submit">删除</button>
-            </form>
-          </td>
-        </tr>
-      {{else}}
-        <tr><td colspan="5" class="muted">暂无分类</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-head"><h3>新增分类</h3></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/categories" class="row-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>名称<input type="text" name="name" required></label>
+        <label>别名<span class="hint">留空自动生成</span><input type="text" name="slug" placeholder="auto"></label>
+        <label>排序<input type="number" name="sort" value="0"></label>
+        <label class="checkbox"><input type="checkbox" name="visible" value="1" checked><span>前台可见</span></label>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 新增</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>名称</th><th>别名</th><th class="num">排序</th><th>可见</th><th class="num">操作</th></tr></thead>
+          <tbody>
+          {{range .Categories}}
+            <tr>
+              <td class="primary-cell">{{.Name}}</td>
+              <td class="mono small">{{.Slug}}</td>
+              <td class="num">{{.Sort}}</td>
+              <td>{{if .Visible}}<span class="badge ok">是</span>{{else}}<span class="badge muted">否</span>{{end}}</td>
+              <td class="actions">
+                <form method="post" action="/admin/categories/{{.ID}}/delete" class="inline" data-confirm="删除该分类？其下商品会变为未分类。">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                  <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
+                </form>
+              </td>
+            </tr>
+          {{else}}
+            <tr><td colspan="5" class="muted">暂无分类。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}

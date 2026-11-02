@@ -107,7 +107,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		pluginCount = len(s.plugins.Active())
 	}
 	s.render(w, r, "admin_dashboard", map[string]any{
-		"Title":       "控制台",
+		"Title":       "概览",
 		"Stats":       stats,
 		"Orders":      orders,
 		"Products":    products,

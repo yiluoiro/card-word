@@ -3,59 +3,142 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <meta name="robots" content="noindex, nofollow">
 <title>{{if .Title}}{{.Title}} · {{end}}{{.Site.Name}}</title>
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/app.js" defer></script>
+<link rel="stylesheet" href="/static/app.css?v={{version}}">
+<script src="/static/app.js?v={{version}}" defer></script>
 </head>{{end}}
 
 {{define "shop_nav"}}
-<header class="topbar">
-  <div class="container topbar-inner">
-    <a class="brand" href="/">{{.Site.Name}}</a>
-    <nav class="nav">
-      <a href="/">商品</a>
-      <a href="/query">订单查询</a>
-      {{if .User}}<a href="/admin">控制台</a>{{else}}<a href="/admin/login">管理</a>{{end}}
+<header class="shop-header">
+  <div class="shop-header-inner">
+    <a class="shop-brand" href="/">
+      <span class="brand-mark">{{template "i_logo" .}}</span>
+      <span>{{.Site.Name}}</span>
+    </a>
+    <nav class="shop-nav">
+      <a href="/" class="{{if eq .Path "/"}}active{{end}}">商品</a>
+      <a href="/query" class="{{if hasPrefix .Path "/query"}}active{{end}}">订单查询</a>
+      {{if .User}}
+        <a href="/admin" class="btn sm">{{template "i_grid" .}} 控制台</a>
+      {{else}}
+        <a href="/admin/login" class="btn sm ghost">{{template "i_lock" .}} 管理</a>
+      {{end}}
     </nav>
   </div>
 </header>
 {{end}}
 
-{{define "admin_nav"}}
-<header class="topbar admin">
-  <div class="container topbar-inner">
-    <a class="brand" href="/admin">{{.Site.Name}} <span class="badge">后台</span></a>
-    <nav class="nav">
-      <a href="/admin" class="{{if eq .Path "/admin"}}active{{end}}">概览</a>
-      <a href="/admin/products" class="{{if hasPrefix .Path "/admin/products"}}active{{end}}">商品</a>
-      <a href="/admin/categories" class="{{if hasPrefix .Path "/admin/categories"}}active{{end}}">分类</a>
-      <a href="/admin/orders" class="{{if hasPrefix .Path "/admin/orders"}}active{{end}}">订单</a>
-      <a href="/admin/coupons" class="{{if hasPrefix .Path "/admin/coupons"}}active{{end}}">优惠码</a>
-      <a href="/admin/plugins" class="{{if hasPrefix .Path "/admin/plugins"}}active{{end}}">应用商城</a>
-      <a href="/admin/settings" class="{{if hasPrefix .Path "/admin/settings"}}active{{end}}">设置</a>
-      <a href="/admin/tokens" class="{{if hasPrefix .Path "/admin/tokens"}}active{{end}}">令牌</a>
-      <a href="/admin/audit" class="{{if hasPrefix .Path "/admin/audit"}}active{{end}}">审计</a>
-      <a href="/" target="_blank" rel="noopener">前台</a>
-    </nav>
-    <form method="post" action="/admin/logout" class="inline">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <button class="btn ghost sm" type="submit">退出</button>
-    </form>
+{{define "admin_sidebar"}}
+<aside class="sidebar">
+  <a class="brand-row" href="/admin">
+    <span class="brand-mark">{{template "i_logo" .}}</span>
+    <span class="brand-text">
+      <b>{{.Site.Name}}</b>
+      <span>控制台</span>
+    </span>
+  </a>
+
+  <div class="nav-group">
+    <p>运营</p>
+    <a class="nav-item {{if eq .Path "/admin"}}active{{end}}" href="/admin">{{template "i_grid" .}} 概览</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/products"}}active{{end}}" href="/admin/products">{{template "i_box" .}} 商品</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/categories"}}active{{end}}" href="/admin/categories">{{template "i_layers" .}} 分类</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/orders"}}active{{end}}" href="/admin/orders">{{template "i_receipt" .}} 订单</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/coupons"}}active{{end}}" href="/admin/coupons">{{template "i_ticket" .}} 优惠码</a>
+  </div>
+
+  <div class="nav-group">
+    <p>平台</p>
+    <a class="nav-item {{if hasPrefix .Path "/admin/plugins"}}active{{end}}" href="/admin/plugins">{{template "i_puzzle" .}} 应用商城</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/settings"}}active{{end}}" href="/admin/settings">{{template "i_sliders" .}} 设置</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/tokens"}}active{{end}}" href="/admin/tokens">{{template "i_key" .}} API 令牌</a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/audit"}}active{{end}}" href="/admin/audit">{{template "i_shield" .}} 审计日志</a>
+  </div>
+
+  <div class="nav-group quick">
+    <p>快捷</p>
+    <a class="nav-item" href="/" target="_blank" rel="noopener">{{template "i_store" .}} 前台店铺</a>
+  </div>
+
+  <div class="sidebar-foot">
+    <div class="user-chip">
+      <span class="avatar">{{if .User}}{{printf "%.1s" .User.Username}}{{else}}?{{end}}</span>
+      <span class="brand-text">
+        <span class="u-name">{{if .User}}{{.User.Username}}{{else}}未登录{{end}}</span>
+        <span class="u-role">管理员</span>
+      </span>
+      <form method="post" action="/admin/logout" class="inline" style="margin-left:auto">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <button class="btn ghost sm" type="submit" title="退出登录">{{template "i_logout" .}}</button>
+      </form>
+    </div>
+  </div>
+</aside>
+{{end}}
+
+{{define "admin_topbar"}}
+<header class="topbar">
+  <div class="crumbs">
+    <a href="/admin" class="muted">控制台</a>
+    <span class="muted">/</span>
+    <b>{{if .Title}}{{.Title}}{{else}}概览{{end}}</b>
+  </div>
+  <div class="spacer"></div>
+  <div class="topbar-actions">
+    {{if .Site.Maintenance}}<span class="badge warn"><span class="dot"></span>维护模式</span>{{end}}
+    <a class="btn ghost sm" href="/" target="_blank" rel="noopener">{{template "i_external" .}} 访问店铺</a>
   </div>
 </header>
 {{end}}
 
 {{define "flash"}}
-{{if .Flash}}<div class="alert ok">{{.Flash}}</div>{{end}}
-{{if .Error}}<div class="alert err">{{.Error}}</div>{{end}}
+{{if .Flash}}<div class="alert ok">{{template "i_check" .}}<div>{{.Flash}}</div></div>{{end}}
+{{if .Error}}<div class="alert err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
 {{end}}
 
 {{define "footer"}}
 <footer class="footer">
-  <div class="container">
-    <p>{{.Site.Name}} · 基于 <a href="https://github.com/" rel="noopener">card word</a> v{{version}} · Apache-2.0</p>
-    {{if .Site.Contact}}<p>联系：{{.Site.Contact}}</p>{{end}}
+  <div class="footer-inner">
+    <p>{{.Site.Name}} · card word v{{version}} · Apache-2.0</p>
+    <div class="footer-links">
+      {{if .Site.Contact}}<span class="muted">{{.Site.Contact}}</span>{{end}}
+      <a href="/query">订单查询</a>
+      <a href="/admin/login">管理入口</a>
+    </div>
   </div>
 </footer>
 {{end}}
+
+{{/* ---------- icon set (lucide-style, inline SVG, no emoji) ---------- */}}
+
+{{define "i_logo"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><path d="M7 15h3"/></svg>{{end}}
+{{define "i_grid"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>{{end}}
+{{define "i_box"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9-5-9 5v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>{{end}}
+{{define "i_layers"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>{{end}}
+{{define "i_receipt"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2Z"/><path d="M9 8h6"/><path d="M9 12h6"/></svg>{{end}}
+{{define "i_ticket"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6Z"/><path d="M13 5v14"/></svg>{{end}}
+{{define "i_puzzle"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6v3a2 2 0 1 0 4 0h2v6h-3a2 2 0 1 0 0 4h3v5H6v-3a2 2 0 1 1 0-4H3V9h3a2 2 0 1 1 4 0Z"/></svg>{{end}}
+{{define "i_sliders"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10"/><path d="M18 6h2"/><path d="M4 12h4"/><path d="M12 12h8"/><path d="M4 18h10"/><path d="M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>{{end}}
+{{define "i_key"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="4.5"/><path d="m11 11 9 9"/><path d="m17 17 2-2"/><path d="m14 14 2-2"/></svg>{{end}}
+{{define "i_shield"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v6c0 4.4-3.2 8.2-8 9.5-4.8-1.3-8-5.1-8-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg>{{end}}
+{{define "i_store"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 4.5 4h15L21 9.5"/><path d="M4 9.5V20h16V9.5"/><path d="M9 20v-6h6v6"/></svg>{{end}}
+{{define "i_logout"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>{{end}}
+{{define "i_lock"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>{{end}}
+{{define "i_plus"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>{{end}}
+{{define "i_search"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>{{end}}
+{{define "i_external"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M19 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>{{end}}
+{{define "i_copy"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 5H6a1 1 0 0 0-1 1v9"/></svg>{{end}}
+{{define "i_check"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>{{end}}
+{{define "i_alert"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 20h19Z"/><path d="M12 9v5"/><path d="M12 17h.01"/></svg>{{end}}
+{{define "i_info"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>{{end}}
+{{define "i_arrow_left"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>{{end}}
+{{define "i_arrow_right"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>{{end}}
+{{define "i_trash"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>{{end}}
+{{define "i_power"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9"/><path d="M6.5 6.5a8 8 0 1 0 11 0"/></svg>{{end}}
+{{define "i_refresh"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>{{end}}
+{{define "i_upload"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>{{end}}
+{{define "i_download"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>{{end}}
+{{define "i_bolt"}}<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>{{end}}
+{{define "i_eye"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>{{end}}

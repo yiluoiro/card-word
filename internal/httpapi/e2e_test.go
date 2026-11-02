@@ -190,7 +190,7 @@ func TestStorefrontAndAdminFlow(t *testing.T) {
 
 	// Product page.
 	resp, body = h.get("/p/e2e-product")
-	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "提交订单") {
+	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "立即购买") {
 		t.Fatalf("product page unexpected: %d", resp.StatusCode)
 	}
 

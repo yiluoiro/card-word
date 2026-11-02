@@ -1,119 +1,157 @@
 {{define "admin_plugins"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <h2 class="page-title">应用商城</h2>
-  <p class="muted">插件以签名 ZIP 包分发，安装后默认停用；启用前请核对下方声明的权限。</p>
-
-  <div class="panel">
-    <div class="panel-head"><h3>上传安装</h3>
-      {{if .SignatureRequired}}<span class="badge warn">已强制要求签名</span>{{else}}<span class="badge muted">签名可选</span>{{end}}
+  <div class="page-head">
+    <div class="titles">
+      <h1>应用商城</h1>
+      <div class="sub">插件以签名 ZIP 分发，安装后默认停用，启用前请核对权限</div>
     </div>
-    <form method="post" action="/admin/plugins/upload" enctype="multipart/form-data" class="form">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>插件包 (.zip，最大 8MB)<input type="file" name="package" accept=".zip" required></label>
-      <label>Ed25519 签名（Base64，可选）<input type="text" name="signature" placeholder="MEUCIQ..."></label>
-      <button class="btn primary" type="submit">上传并解析</button>
-    </form>
+    <div class="actions">
+      {{if .SignatureRequired}}
+        <span class="badge ok">{{template "i_shield" .}} 强制签名</span>
+      {{else}}
+        <span class="badge warn">{{template "i_alert" .}} 允许未签名包</span>
+      {{end}}
+    </div>
   </div>
 
-  <h3 class="section-title">已安装（{{len .Installed}}）</h3>
-  {{range .Installed}}
-  <div class="panel plugin">
+  <div class="panel">
     <div class="panel-head">
-      <div>
-        <h3>{{.Name}} <span class="mono small muted">{{.UID}} v{{.Version}}</span></h3>
-        <p class="muted small">{{.Description}}</p>
+      <h3>上传安装</h3>
+      <span class="panel-sub">ZIP ≤ 8MB，清单必须位于根目录</span>
+    </div>
+    <div class="panel-body">
+      <form method="post" action="/admin/plugins/upload" enctype="multipart/form-data" class="form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <div class="row">
+          <label>插件包<input type="file" name="package" accept=".zip" required></label>
+          <label>Ed25519 签名（Base64）<span class="hint">强制签名模式下必填</span><input type="text" name="signature" placeholder="MEUCIQ..."></label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" type="submit">{{template "i_upload" .}} 上传并校验</button>
+          <span class="muted small">安装后不会自动启用</span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <h3 class="section-title">已安装 · {{len .Installed}}</h3>
+  {{range .Installed}}
+  {{$plugin := .}}
+  <div class="panel plugin">
+    <div class="plugin-head">
+      <div class="plugin-icon">{{template "i_puzzle" .}}</div>
+      <div class="plugin-meta">
+        <h3>{{.Name}} <span class="mono tiny muted">{{.UID}} · v{{.Version}}</span></h3>
+        <div class="small muted">{{if .Description}}{{.Description}}{{else}}无描述{{end}}</div>
       </div>
-      <div class="actions">
-        {{if .Enabled}}<span class="badge ok">已启用</span>{{else}}<span class="badge muted">已停用</span>{{end}}
+      <div class="pill-group">
+        {{if .Enabled}}<span class="badge ok"><span class="dot"></span>已启用</span>{{else}}<span class="badge muted">已停用</span>{{end}}
         {{if .Signed}}<span class="badge ok">签名已验证</span>{{else}}<span class="badge warn">未签名</span>{{end}}
       </div>
     </div>
+
     {{if .Broken}}
-      <div class="alert err">清单解析失败：{{.Error}}</div>
+    <div class="plugin-body">
+      <div class="alert err">{{template "i_alert" .}}<div>清单解析失败：{{.Error}}</div></div>
+    </div>
     {{else}}
+    <div class="plugin-body">
       <dl class="kv">
-        <dt>类型</dt><dd>{{.Kind}}</dd>
-        <dt>运行时</dt><dd>{{.Runtime}}</dd>
-        <dt>作者</dt><dd>{{if .Author}}{{.Author}}{{else}}-{{end}}</dd>
-        <dt>权限</dt><dd>{{if .Permissions}}<span class="mono small">{{range .Permissions}}{{.}} {{end}}</span>{{else}}无{{end}}</dd>
-        <dt>订阅事件</dt><dd>{{if .Hooks}}<span class="mono small">{{range .Hooks}}{{.}} {{end}}</span>{{else}}无{{end}}</dd>
-        <dt>来源</dt><dd>{{.Source}}</dd>
-        <dt>SHA-256</dt><dd class="mono tiny">{{.SHA256}}</dd>
+        <dt>类型 / 运行时</dt><dd><span class="badge accent">{{.Kind}}</span> <span class="mono small">{{.Runtime}}</span></dd>
+        <dt>作者</dt><dd>{{if .Author}}{{.Author}}{{else}}—{{end}}</dd>
+        <dt>声明权限</dt><dd>{{if .Permissions}}<span class="pill-group">{{range .Permissions}}<span class="badge">{{.}}</span>{{end}}</span>{{else}}<span class="muted">无</span>{{end}}</dd>
+        <dt>订阅事件</dt><dd>{{if .Hooks}}<span class="pill-group">{{range .Hooks}}<span class="badge muted">{{.}}</span>{{end}}</span>{{else}}<span class="muted">无</span>{{end}}</dd>
+        <dt>来源</dt><dd class="small">{{.Source}}</dd>
+        <dt>SHA-256</dt><dd class="mono tiny muted">{{.SHA256}}</dd>
       </dl>
-      {{if .Error}}<div class="alert warn">运行时错误：{{.Error}}</div>{{end}}
+      {{if .Error}}<div class="alert warn">{{template "i_alert" .}}<div>运行时提示：{{.Error}}</div></div>{{end}}
 
       {{if .Settings}}
-      <form method="post" action="/admin/plugins/{{.UID}}/settings" class="form">
+      <form method="post" action="/admin/plugins/{{.UID}}/settings" class="form" style="margin-top:14px">
         <input type="hidden" name="csrf" value="{{$.CSRF}}">
         <h4>插件配置</h4>
-        {{range .Settings}}
-        <label>{{.Label}}{{if .Required}} *{{end}}
-          {{if eq .Type "boolean"}}
-            <input type="checkbox" name="setting_{{.Key}}" value="1" {{if index $.Values .Key}}checked{{end}}>
-          {{else if eq .Type "secret"}}
-            <input type="text" name="setting_{{.Key}}" placeholder="已保存的值不会显示" autocomplete="off">
-          {{else if eq .Type "select"}}
-            <select name="setting_{{.Key}}">
-              {{$cur := index $.Values .Key}}
-              {{range .Options}}<option value="{{.Value}}" {{if eq .Value $cur}}selected{{end}}>{{.Label}}</option>{{end}}
-            </select>
-          {{else}}
-            <input type="{{if eq .Type "number"}}number{{else}}text{{end}}" name="setting_{{.Key}}" value="{{index $.Values .Key}}">
+        <div class="grid-form">
+          {{range .Settings}}
+          <label>{{.Label}}{{if .Required}} <span class="muted">*</span>{{end}}
+            {{if eq .Type "boolean"}}
+              <label class="checkbox" style="margin-top:4px">
+                <input type="checkbox" name="setting_{{.Key}}" value="1" {{if index $plugin.Values .Key}}checked{{end}}>
+                <span>启用</span>
+              </label>
+            {{else if eq .Type "secret"}}
+              <input type="text" name="setting_{{.Key}}" placeholder="已保存，留空不修改" autocomplete="off">
+            {{else if eq .Type "select"}}
+              <select name="setting_{{.Key}}">
+                {{$cur := index $plugin.Values .Key}}
+                {{range .Options}}<option value="{{.Value}}" {{if eq .Value $cur}}selected{{end}}>{{.Label}}</option>{{end}}
+              </select>
+            {{else}}
+              <input type="{{if eq .Type "number"}}number{{else}}text{{end}}" name="setting_{{.Key}}" value="{{index $plugin.Values .Key}}">
+            {{end}}
+            {{if .Description}}<span class="hint">{{.Description}}</span>{{end}}
+          </label>
           {{end}}
-          {{if .Description}}<span class="hint">{{.Description}}</span>{{end}}
-        </label>
-        {{end}}
-        <button class="btn sm" type="submit">保存配置</button>
+        </div>
+        <div class="actions"><button class="btn sm" type="submit">保存配置</button></div>
       </form>
       {{end}}
+    </div>
 
-      <div class="actions wrap">
-        {{if .Enabled}}
-          <form method="post" action="/admin/plugins/{{.UID}}/disable" class="inline">
-            <input type="hidden" name="csrf" value="{{$.CSRF}}">
-            <button class="btn sm" type="submit">停用</button>
-          </form>
-          <a class="btn sm ghost" href="/admin/plugins/{{.UID}}/console" target="_blank" rel="noopener">打开控制台</a>
-        {{else}}
-          <form method="post" action="/admin/plugins/{{.UID}}/enable" class="inline" data-confirm="启用该插件？它会获得上面列出的权限。">
-            <input type="hidden" name="csrf" value="{{$.CSRF}}">
-            <button class="btn sm primary" type="submit">启用</button>
-          </form>
-        {{end}}
-        <form method="post" action="/admin/plugins/{{.UID}}/delete" class="inline" data-confirm="卸载该插件并删除其配置？">
+    <div class="plugin-foot">
+      {{if .Enabled}}
+        <form method="post" action="/admin/plugins/{{.UID}}/disable" class="inline">
           <input type="hidden" name="csrf" value="{{$.CSRF}}">
-          <button class="btn sm danger" type="submit">卸载</button>
+          <button class="btn sm" type="submit">{{template "i_power" .}} 停用</button>
         </form>
-      </div>
+        <a class="btn sm ghost" href="/admin/plugins/{{.UID}}/console" target="_blank" rel="noopener">{{template "i_external" .}} 打开控制台</a>
+      {{else}}
+        <form method="post" action="/admin/plugins/{{.UID}}/enable" class="inline" data-confirm="启用后该插件将获得上方声明的权限，确认继续？">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}">
+          <button class="btn sm primary" type="submit">{{template "i_power" .}} 启用</button>
+        </form>
+      {{end}}
+      <form method="post" action="/admin/plugins/{{.UID}}/delete" class="inline" data-confirm="卸载会删除插件文件与其配置，确认？">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <button class="btn sm danger" type="submit">{{template "i_trash" .}} 卸载</button>
+      </form>
+    </div>
     {{end}}
   </div>
   {{else}}
-  <div class="empty">还没有安装任何插件。</div>
+  <div class="empty">
+    {{template "i_puzzle" .}}
+    <div class="title">还没有安装插件</div>
+    <div>上传一个 ZIP，或从下方商城推荐中安装。</div>
+  </div>
   {{end}}
 
   <h3 class="section-title">商城推荐</h3>
-  {{if .MarketError}}<div class="alert warn">远程商城索引加载失败：{{.MarketError}}</div>{{end}}
+  {{if .MarketError}}<div class="alert warn">{{template "i_alert" .}}<div>远程索引加载失败：{{.MarketError}}</div></div>{{end}}
   <div class="grid">
     {{range .Market}}
     <div class="card">
       <div class="card-head">
-        <h3>{{.Name}}</h3>
+        <div>
+          <div class="name" style="font-weight:620">{{.Name}}</div>
+          <div class="tiny muted mono">{{.UID}} · v{{.Version}}</div>
+        </div>
         <span class="badge">{{.Kind}}</span>
       </div>
-      <p class="muted small">{{.Description}}</p>
-      <p class="muted tiny mono">{{.UID}} v{{.Version}}</p>
+      <p class="small muted" style="margin:8px 0 0">{{.Description}}</p>
       <div class="card-foot">
         {{if .DownloadURL}}
-        <form method="post" action="/admin/market/install" class="inline" data-confirm="从商城安装该插件？">
+        <form method="post" action="/admin/market/install" class="inline" data-confirm="从商城安装 {{.Name}}？">
           <input type="hidden" name="csrf" value="{{$.CSRF}}">
           <input type="hidden" name="uid" value="{{.UID}}">
-          <button class="btn sm primary" type="submit" {{if not $.AllowInstall}}disabled{{end}}>安装</button>
+          <button class="btn sm primary" type="submit" {{if not $.AllowInstall}}disabled{{end}}>{{template "i_download" .}} 安装</button>
         </form>
         {{else}}
-        <span class="muted small">示例条目：请上传官方签名的安装包</span>
+        <span class="tiny muted">示例条目 · 请上传官方签名包</span>
         {{end}}
       </div>
     </div>
@@ -122,157 +160,210 @@
     {{end}}
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_settings"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container narrow">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
   {{template "flash" .}}
-  <h2 class="page-title">系统设置</h2>
+  <div class="page-head">
+    <div class="titles">
+      <h1>设置</h1>
+      <div class="sub">站点信息、支付渠道与邮件通知</div>
+    </div>
+  </div>
+
   <form method="post" action="/admin/settings" class="form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
 
     <div class="panel">
-      <h3>站点</h3>
-      <label>站点名称<input type="text" name="site.name" value="{{index .Settings "site.name"}}"></label>
-      <label>副标题<input type="text" name="site.tagline" value="{{index .Settings "site.tagline"}}"></label>
-      <label>公告<input type="text" name="site.notice" value="{{index .Settings "site.notice"}}"></label>
-      <label>联系邮箱<input type="text" name="site.contact_email" value="{{index .Settings "site.contact_email"}}"></label>
-      <label>默认货币<input type="text" name="site.currency" value="{{index .Settings "site.currency"}}"></label>
-      <label class="checkbox">
-        <input type="checkbox" name="maintenance" value="1" {{if eq (index .Settings "site.maintenance") "1"}}checked{{end}}>
-        <span>维护模式（前台仅展示维护提示）</span>
-      </label>
-    </div>
-
-    <div class="panel">
-      <h3>支付</h3>
-      <label>启用的支付方式（逗号分隔，all 表示全部）
-        <input type="text" name="payment.driver" value="{{index .Settings "payment.driver"}}" placeholder="manual,epay">
-        <span class="hint">可用：{{range .Drivers}}{{.Name}} ({{.Title}})；{{end}}</span>
-      </label>
-      <label>人工确认说明<textarea name="payment.manual.instructions" rows="3">{{index .Settings "payment.manual.instructions"}}</textarea></label>
-      <div class="row">
-        <label>EPay 网关地址<input type="text" name="payment.epay.gateway" value="{{index .Settings "payment.epay.gateway"}}" placeholder="https://pay.example.com"></label>
-        <label>EPay 商户 ID<input type="text" name="payment.epay.pid" value="{{index .Settings "payment.epay.pid"}}"></label>
-      </div>
-      <div class="row">
-        <label>EPay 密钥<input type="password" name="payment.epay.key" placeholder="{{if index .Settings "payment.epay.key"}}已保存，留空不修改{{else}}未设置{{end}}" autocomplete="new-password"></label>
-        <label>支付类型<input type="text" name="payment.epay.type" value="{{index .Settings "payment.epay.type"}}" placeholder="alipay"></label>
+      <div class="panel-head"><h3>站点</h3></div>
+      <div class="panel-body">
+        <div class="row">
+          <label>站点名称<input type="text" name="site.name" value="{{index .Settings "site.name"}}"></label>
+          <label>默认货币<input type="text" name="site.currency" value="{{index .Settings "site.currency"}}"></label>
+        </div>
+        <label style="margin-top:14px">副标题<input type="text" name="site.tagline" value="{{index .Settings "site.tagline"}}"></label>
+        <label style="margin-top:14px">公告<input type="text" name="site.notice" value="{{index .Settings "site.notice"}}"></label>
+        <label style="margin-top:14px">联系邮箱<input type="text" name="site.contact_email" value="{{index .Settings "site.contact_email"}}"></label>
+        <label class="checkbox" style="margin-top:14px">
+          <input type="checkbox" name="maintenance" value="1" {{if eq (index .Settings "site.maintenance") "1"}}checked{{end}}>
+          <span>维护模式（前台仅展示维护提示）</span>
+        </label>
       </div>
     </div>
 
     <div class="panel">
-      <h3>邮件通知</h3>
-      <div class="row">
-        <label>SMTP 主机<input type="text" name="smtp.host" value="{{index .Settings "smtp.host"}}"></label>
-        <label>端口<input type="number" name="smtp.port" value="{{index .Settings "smtp.port"}}" placeholder="587"></label>
+      <div class="panel-head"><h3>支付</h3><span class="panel-sub">留空的渠道不会出现在前台</span></div>
+      <div class="panel-body">
+        <label>启用的支付方式
+          <input type="text" name="payment.driver" value="{{index .Settings "payment.driver"}}" placeholder="manual,epay">
+          <span class="hint">逗号分隔；填 all 表示全部。当前可用：{{range .Drivers}}{{.Name}}（{{.Title}}） {{end}}</span>
+        </label>
+        <label style="margin-top:14px">人工确认说明<textarea name="payment.manual.instructions" rows="3">{{index .Settings "payment.manual.instructions"}}</textarea></label>
+        <div class="row" style="margin-top:14px">
+          <label>EPay 网关地址<input type="text" name="payment.epay.gateway" value="{{index .Settings "payment.epay.gateway"}}" placeholder="https://pay.example.com"></label>
+          <label>商户 ID<input type="text" name="payment.epay.pid" value="{{index .Settings "payment.epay.pid"}}"></label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label>商户密钥<input type="password" name="payment.epay.key" placeholder="{{if index .Settings "payment.epay.key"}}已保存，留空不修改{{else}}未设置{{end}}" autocomplete="new-password"></label>
+          <label>支付类型<input type="text" name="payment.epay.type" value="{{index .Settings "payment.epay.type"}}" placeholder="alipay"></label>
+        </div>
       </div>
-      <div class="row">
-        <label>用户名<input type="text" name="smtp.username" value="{{index .Settings "smtp.username"}}" autocomplete="off"></label>
-        <label>密码<input type="password" name="smtp.password" placeholder="{{if index .Settings "smtp.password"}}已保存，留空不修改{{else}}未设置{{end}}" autocomplete="new-password"></label>
-      </div>
-      <div class="row">
-        <label>发件人<input type="text" name="smtp.from" value="{{index .Settings "smtp.from"}}" placeholder="noreply@example.com"></label>
-        <label>发件人名称<input type="text" name="smtp.from_name" value="{{index .Settings "smtp.from_name"}}"></label>
-      </div>
-      <label class="checkbox">
-        <input type="checkbox" name="smtp.tls" value="1" {{if ne (index .Settings "smtp.tls") "0"}}checked{{end}}>
-        <span>使用 STARTTLS（465 端口请直接使用 SSL 网关）</span>
-      </label>
     </div>
 
-    <button class="btn primary" type="submit">保存设置</button>
+    <div class="panel">
+      <div class="panel-head"><h3>邮件通知</h3><span class="panel-sub">发货后自动把卡密发送给买家</span></div>
+      <div class="panel-body">
+        <div class="row">
+          <label>SMTP 主机<input type="text" name="smtp.host" value="{{index .Settings "smtp.host"}}"></label>
+          <label>端口<input type="number" name="smtp.port" value="{{index .Settings "smtp.port"}}" placeholder="587"></label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label>用户名<input type="text" name="smtp.username" value="{{index .Settings "smtp.username"}}" autocomplete="off"></label>
+          <label>密码<input type="password" name="smtp.password" placeholder="{{if index .Settings "smtp.password"}}已保存，留空不修改{{else}}未设置{{end}}" autocomplete="new-password"></label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label>发件人地址<input type="text" name="smtp.from" value="{{index .Settings "smtp.from"}}" placeholder="noreply@example.com"></label>
+          <label>发件人名称<input type="text" name="smtp.from_name" value="{{index .Settings "smtp.from_name"}}"></label>
+        </div>
+        <label class="checkbox" style="margin-top:14px">
+          <input type="checkbox" name="smtp.tls" value="1" {{if ne (index .Settings "smtp.tls") "0"}}checked{{end}}>
+          <span>使用 STARTTLS（465 端口请直接使用 SSL 网关）</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" type="submit">{{template "i_check" .}} 保存设置</button>
+      <span class="muted small">保存后立即生效</span>
+    </div>
   </form>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_audit"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content">
   {{template "flash" .}}
-  <h2 class="page-title">审计日志</h2>
+  <div class="page-head">
+    <div class="titles">
+      <h1>审计日志</h1>
+      <div class="sub">所有敏感操作都会留下操作者、来源 IP 与时间</div>
+    </div>
+  </div>
+
   <form class="toolbar" method="get" action="/admin/audit">
-    <input type="search" name="action" value="{{.Action}}" placeholder="按动作前缀过滤，如 order. / plugin.">
-    <button class="btn sm" type="submit">过滤</button>
+    <input type="search" name="action" value="{{.Action}}" placeholder="按动作前缀过滤，如 order. / plugin. / auth.">
+    <button class="btn sm" type="submit">{{template "i_search" .}} 过滤</button>
   </form>
+
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>对象</th><th>IP</th><th>详情</th></tr></thead>
-      <tbody>
-      {{range .Entries}}
-        <tr>
-          <td class="muted small">{{datetime .CreatedAt}}</td>
-          <td>{{.Actor}}</td>
-          <td class="mono small">{{.Action}}</td>
-          <td class="mono small">{{.Target}}</td>
-          <td class="muted small">{{.IP}}</td>
-          <td class="small">{{.Detail}}</td>
-        </tr>
-      {{else}}
-        <tr><td colspan="6" class="muted">暂无记录</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>对象</th><th>IP</th><th>详情</th></tr></thead>
+          <tbody>
+          {{range .Entries}}
+            <tr>
+              <td class="secondary-cell" style="white-space:nowrap">{{datetime .CreatedAt}}</td>
+              <td>{{.Actor}}</td>
+              <td><span class="badge accent mono">{{.Action}}</span></td>
+              <td class="mono small">{{if .Target}}{{.Target}}{{else}}—{{end}}</td>
+              <td class="secondary-cell mono">{{.IP}}</td>
+              <td class="small">{{if .Detail}}{{.Detail}}{{else}}—{{end}}</td>
+            </tr>
+          {{else}}
+            <tr><td colspan="6" class="muted">暂无记录。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
 
 {{define "admin_tokens"}}{{template "head" .}}
-<body class="admin">
-{{template "admin_nav" .}}
-<main class="container narrow">
+<body class="app">
+{{template "admin_sidebar" .}}
+<div class="main">
+{{template "admin_topbar" .}}
+<main class="content narrow">
   {{template "flash" .}}
-  <h2 class="page-title">API 令牌</h2>
+  <div class="page-head">
+    <div class="titles">
+      <h1>API 令牌</h1>
+      <div class="sub">用于第三方对接下单、查单与导入卡密</div>
+    </div>
+  </div>
+
   {{if .NewToken}}
   <div class="alert warn">
-    <strong>请立即保存该令牌，它只显示一次：</strong>
-    <pre class="token">{{.NewToken}}</pre>
+    {{template "i_key" .}}
+    <div>
+      <strong>请立即保存，令牌只显示一次：</strong>
+      <pre class="token" style="margin-top:8px">{{.NewToken}}</pre>
+    </div>
   </div>
   {{end}}
+
   <div class="panel">
-    <form method="post" action="/admin/tokens" class="form row-form">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>令牌名称<input type="text" name="name" placeholder="对接上游" required></label>
-      <label class="checkbox"><input type="checkbox" name="scope_write" value="1"><span>允许写入（下单/导入卡密）</span></label>
-      <button class="btn primary" type="submit">创建</button>
-    </form>
+    <div class="panel-head"><h3>创建令牌</h3></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/tokens" class="row-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>名称<input type="text" name="name" placeholder="对接上游" required></label>
+        <label class="checkbox"><input type="checkbox" name="scope_write" value="1"><span>允许写入（下单 / 导入卡密）</span></label>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 创建</button></div>
+      </form>
+    </div>
   </div>
+
   <div class="panel">
-    <table class="table">
-      <thead><tr><th>名称</th><th>前缀</th><th>权限</th><th>最近使用</th><th>操作</th></tr></thead>
-      <tbody>
-      {{range .Tokens}}
-        <tr>
-          <td>{{.Name}}</td>
-          <td class="mono small">{{.Prefix}}…</td>
-          <td class="small mono">{{range .Scopes}}{{.}} {{end}}</td>
-          <td class="muted small">{{if .LastUsedAt}}{{datetime .LastUsedAt}}{{else}}从未{{end}}</td>
-          <td>
-            {{if .RevokedAt}}<span class="badge muted">已撤销</span>
-            {{else}}
-            <form method="post" action="/admin/tokens/{{.ID}}/revoke" class="inline" data-confirm="撤销该令牌？">
-              <input type="hidden" name="csrf" value="{{$.CSRF}}">
-              <button class="btn sm danger" type="submit">撤销</button>
-            </form>
-            {{end}}
-          </td>
-        </tr>
-      {{else}}
-        <tr><td colspan="5" class="muted">暂无令牌</td></tr>
-      {{end}}
-      </tbody>
-    </table>
+    <div class="panel-body flush">
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>名称</th><th>前缀</th><th>权限</th><th>最近使用</th><th class="num">操作</th></tr></thead>
+          <tbody>
+          {{range .Tokens}}
+            <tr>
+              <td class="primary-cell">{{.Name}}</td>
+              <td class="mono small">{{.Prefix}}…</td>
+              <td>{{range .Scopes}}<span class="badge muted mono">{{.}}</span> {{end}}</td>
+              <td class="secondary-cell">{{if .LastUsedAt}}{{datetime .LastUsedAt}}{{else}}从未{{end}}</td>
+              <td class="actions">
+                {{if .RevokedAt}}
+                  <span class="badge muted">已撤销</span>
+                {{else}}
+                <form method="post" action="/admin/tokens/{{.ID}}/revoke" class="inline" data-confirm="撤销后该令牌立即失效，确认？">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                  <button class="btn sm danger" type="submit">撤销</button>
+                </form>
+                {{end}}
+              </td>
+            </tr>
+          {{else}}
+            <tr><td colspan="5" class="muted">暂无令牌。</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
-{{template "footer" .}}
+</div>
 </body>
 </html>{{end}}
