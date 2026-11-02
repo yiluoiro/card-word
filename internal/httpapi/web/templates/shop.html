@@ -29,20 +29,21 @@
   </div>
 
   <div id="products"></div>
-  <form class="toolbar" method="get" action="/">
-    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或关键字">
-    {{if .ActiveCat}}<input type="hidden" name="cat" value="{{.ActiveCat.Slug}}">{{end}}
-    <button class="btn sm" type="submit">{{template "i_search" .}} 搜索</button>
-    {{if or .Search .ActiveCat}}<a class="btn sm ghost" href="/">清除筛选</a>{{end}}
-  </form>
+  <div class="search-row">
+    <form class="search" method="get" action="/" role="search">
+      {{if .ActiveCat}}<input type="hidden" name="cat" value="{{.ActiveCat.Slug}}">{{end}}
+      <span class="search-icon">{{template "i_search" .}}</span>
+      <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或关键字" aria-label="搜索商品">
+      <button class="btn primary" type="submit">搜索</button>
+    </form>
+    {{if or .Search .ActiveCat}}<a class="btn ghost" href="/">清除筛选</a>{{end}}
+  </div>
 
   {{if .Categories}}
-  <div class="chips">
-    <a class="chip {{if not .ActiveCat}}active{{end}}" href="/{{if .Search}}?q={{.Search}}{{end}}">全部</a>
+  <div class="segmented">
+    <a class="{{if not .ActiveCat}}active{{end}}" href="/{{if .Search}}?q={{.Search}}{{end}}">全部</a>
     {{range .Categories}}
-    <a class="chip {{if and $.ActiveCat (eq $.ActiveCat.Slug .Slug)}}active{{end}}" href="/?cat={{.Slug}}{{if $.Search}}&q={{$.Search}}{{end}}">
-      {{template "i_layers" .}} {{.Name}}
-    </a>
+    <a class="{{if and $.ActiveCat (eq $.ActiveCat.Slug .Slug)}}active{{end}}" href="/?cat={{.Slug}}{{if $.Search}}&q={{$.Search}}{{end}}">{{.Name}}</a>
     {{end}}
   </div>
   {{end}}

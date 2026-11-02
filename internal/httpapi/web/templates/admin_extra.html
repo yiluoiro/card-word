@@ -281,11 +281,11 @@
 
   <form class="toolbar" method="get" action="/admin/audit">
     <input type="search" name="action" value="{{.Action}}" placeholder="按动作前缀过滤，如 order. / plugin. / auth.">
-    <button class="btn sm" type="submit">{{template "i_search" .}} 过滤</button>
+    <button class="btn primary" type="submit">{{template "i_search" .}} 过滤</button>
   </form>
   {{template "pager" .}}
   <div class="actions" style="margin-bottom:12px">
-    <a class="btn sm" href="/admin/audit/export.csv?action={{.Action}}">{{template "i_download" .}} 导出 CSV</a>
+    <a class="btn" href="/admin/audit/export.csv?action={{.Action}}">{{template "i_download" .}} 导出 CSV</a>
   </div>
 
   <div class="panel">

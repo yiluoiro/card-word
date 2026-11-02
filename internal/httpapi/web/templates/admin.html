@@ -111,9 +111,10 @@
     <div class="actions"><a class="btn primary sm" href="/admin/products/0">{{template "i_plus" .}} 新建商品</a></div>
   </div>
 
-  <form class="toolbar" method="get" action="/admin/products">
-    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或别名">
-    <button class="btn sm" type="submit">{{template "i_search" .}} 搜索</button>
+  <form class="search" method="get" action="/admin/products" role="search" style="max-width:540px;margin-bottom:16px">
+    <span class="search-icon">{{template "i_search" .}}</span>
+    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或别名" aria-label="搜索商品">
+    <button class="btn primary" type="submit">搜索</button>
   </form>
 
   <form id="bulkProducts" method="post" action="/admin/products/bulk" class="toolbar">
@@ -340,8 +341,8 @@
       <option value="closed" {{if eq .Status "closed"}}selected{{end}}>已关闭</option>
       <option value="refunded" {{if eq .Status "refunded"}}selected{{end}}>已退款</option>
     </select>
-    <button class="btn sm" type="submit">{{template "i_search" .}} 筛选</button>
-    <a class="btn sm" href="/admin/orders/export.csv?status={{.Status}}&q={{.Search}}">{{template "i_download" .}} 导出 CSV</a>
+    <button class="btn primary" type="submit">{{template "i_search" .}} 筛选</button>
+    <a class="btn" href="/admin/orders/export.csv?status={{.Status}}&q={{.Search}}">{{template "i_download" .}} 导出 CSV</a>
   </form>
   {{template "pager" .}}
 
