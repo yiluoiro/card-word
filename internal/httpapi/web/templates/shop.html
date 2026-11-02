@@ -8,18 +8,29 @@
   <section class="hero">
     <div class="hero-inner">
       <span class="eyebrow">{{template "i_bolt" .}} 自动发货 · 全天候在线</span>
-      <h1>{{.Site.Name}}</h1>
+      <h1>{{.Site.Name}}<br>把交付做成一瞬间</h1>
       <p>{{.Site.Tagline}}</p>
-      <div class="hero-meta">
-        <div>{{template "i_bolt" .}} 支付后秒级出卡</div>
-        <div>{{template "i_shield" .}} 卡密加密存储</div>
-        <div>{{template "i_receipt" .}} 订单可随时查询</div>
+      <div class="hero-actions">
+        <a class="btn primary lg" href="#products">浏览商品 {{template "i_arrow_right" .}}</a>
+        <a class="btn lg" href="/query">{{template "i_receipt" .}} 查询订单</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="k">平均发货</div><div class="v">秒级</div></div>
+        <div class="hero-stat"><div class="k">卡密存储</div><div class="v">AES-256<small>加密</small></div></div>
+        <div class="hero-stat"><div class="k">自动化</div><div class="v">24/7<small>无人值守</small></div></div>
       </div>
     </div>
   </section>
 
-  <form class="toolbar" method="get" action="/" style="margin-bottom:14px">
-    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或关键字" style="min-width:240px">
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>挑选商品</h3><p>按分类筛选，查看实时库存与价格。</p></div>
+    <div class="step"><div class="n">2</div><h3>完成支付</h3><p>支持易支付网关与人工确认，订单 15 分钟内有效。</p></div>
+    <div class="step"><div class="n">3</div><h3>领取卡密</h3><p>支付回调后自动发货，卡密在订单页与邮件中可见。</p></div>
+  </div>
+
+  <div id="products"></div>
+  <form class="toolbar" method="get" action="/">
+    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或关键字">
     {{if .ActiveCat}}<input type="hidden" name="cat" value="{{.ActiveCat.Slug}}">{{end}}
     <button class="btn sm" type="submit">{{template "i_search" .}} 搜索</button>
     {{if or .Search .ActiveCat}}<a class="btn sm ghost" href="/">清除筛选</a>{{end}}
@@ -41,15 +52,16 @@
     {{range .Products}}
     <a class="card product" href="/p/{{.Slug}}">
       <div class="card-head">
-        <div>
-          <div class="name">{{.Name}}</div>
-          <div class="small muted">{{if .Summary}}{{.Summary}}{{else}}&nbsp;{{end}}</div>
-        </div>
+        <span class="product-icon">{{template "i_box" .}}</span>
         {{if gt .Stock 0}}
           <span class="badge ok"><span class="dot"></span>有货</span>
         {{else}}
           <span class="badge muted">缺货</span>
         {{end}}
+      </div>
+      <div>
+        <div class="name">{{.Name}}</div>
+        <div class="desc">{{if .Summary}}{{.Summary}}{{else}}支付后自动发货，卡密即时可见{{end}}</div>
       </div>
       <div class="card-foot">
         <span class="price">{{money .PriceCents .Currency}}</span>
@@ -73,33 +85,74 @@
 {{define "product"}}{{template "head" .}}
 <body>
 {{template "shop_nav" .}}
-<main class="container narrow">
+<main class="container">
   {{template "flash" .}}
   <a class="back" href="/">{{template "i_arrow_left" .}} 返回商品列表</a>
 
-  <div class="panel">
-    <div class="panel-head">
-      <div>
-        <h2>{{.Product.Name}}</h2>
-        <div class="panel-sub">{{if .Product.CategoryName}}{{.Product.CategoryName}} · {{end}}即时自动发货</div>
+  <div class="two-col">
+    <div>
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>{{.Product.Name}}</h2>
+            <div class="panel-sub">{{if .Product.CategoryName}}{{.Product.CategoryName}} · {{end}}即时自动发货</div>
+          </div>
+          {{if gt .Product.Stock 0}}
+            <span class="badge ok"><span class="dot"></span>库存 {{.Product.Stock}}</span>
+          {{else}}
+            <span class="badge muted">暂时缺货</span>
+          {{end}}
+        </div>
+        <div class="panel-body">
+          {{if .Product.Summary}}<p class="muted">{{.Product.Summary}}</p>{{end}}
+          {{if .Product.Description}}
+          <div class="prose" style="margin-top:12px">{{.Product.Description}}</div>
+          {{end}}
+        </div>
       </div>
-      {{if gt .Product.Stock 0}}
-        <span class="badge ok"><span class="dot"></span>库存 {{.Product.Stock}}</span>
-      {{else}}
-        <span class="badge muted">暂时缺货</span>
-      {{end}}
-    </div>
-    <div class="panel-body">
-      <div class="price-lg">{{money .Product.PriceCents .Product.Currency}}</div>
-      {{if .Product.Summary}}<p class="muted small">{{.Product.Summary}}</p>{{end}}
 
-      <form method="post" action="/checkout" class="form" style="margin-top:18px">
+      <div class="panel">
+        <div class="panel-head"><h3>交付与售后</h3></div>
+        <div class="panel-body">
+          <ul class="checklist">
+            <li>{{template "i_bolt" .}} 支付成功后立即自动发货，卡密在订单页展示并同步邮件</li>
+            <li>{{template "i_lock" .}} 卡密加密存储，仅在发货与人工查看时解密</li>
+            <li>{{template "i_shield" .}} 订单凭查询凭证访问，浏览器会话 30 分钟内有效</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>常见问题</h3></div>
+        <div class="panel-body">
+          <details>
+            <summary style="cursor:pointer;font-weight:620">多久能收到卡密？</summary>
+            <p class="small muted" style="margin-top:8px">支付回调确认后通常在数秒内完成发货；如遇库存不足会转为「已支付待补发」，由管理员处理。</p>
+          </details>
+          <details style="margin-top:10px">
+            <summary style="cursor:pointer;font-weight:620">支付完成后页面没刷新怎么办？</summary>
+            <p class="small muted" style="margin-top:8px">用订单号与查询凭证在「订单查询」中打开订单，或直接刷新订单页。</p>
+          </details>
+          <details style="margin-top:10px">
+            <summary style="cursor:pointer;font-weight:620">支持退款吗？</summary>
+            <p class="small muted" style="margin-top:8px">虚拟商品一经发出不支持无理由退款；若卡密本身无法使用，请联系站长核实处理。</p>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <aside class="buy-card">
+      <div class="small muted">单价</div>
+      <div class="price-lg">{{money .Product.PriceCents .Product.Currency}}</div>
+      <p class="small muted" style="margin-bottom:18px">库存 {{.Product.Stock}} · {{if eq .Product.Stock 0}}暂时缺货{{else}}支付后自动发货{{end}}</p>
+
+      <form method="post" action="/checkout" class="form">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <input type="hidden" name="product_id" value="{{.Product.ID}}">
         <input type="hidden" name="idem" value="{{.CSRF}}{{.Product.ID}}">
 
         <div class="row">
-          <label>购买数量
+          <label>数量
             <input type="number" name="quantity" value="{{.Product.MinQty}}" min="{{.Product.MinQty}}" max="{{.Product.MaxQty}}" required>
           </label>
           <label>支付方式
@@ -108,55 +161,25 @@
             </select>
           </label>
         </div>
-        <div class="row">
-          <label>接收卡密的邮箱（可选）
-            <input type="email" name="email" placeholder="you@example.com" autocomplete="email">
-          </label>
-          <label>联系方式（可选）
-            <input type="text" name="contact" placeholder="QQ / TG / 微信" autocomplete="off">
-          </label>
-        </div>
+        <label>接收卡密的邮箱（可选）
+          <input type="email" name="email" placeholder="you@example.com" autocomplete="email">
+        </label>
+        <label>联系方式（可选）
+          <input type="text" name="contact" placeholder="QQ / TG / 微信" autocomplete="off">
+        </label>
         <label>优惠码（可选）
           <input type="text" name="coupon" placeholder="SAVE10" autocomplete="off">
         </label>
         <label class="checkbox">
           <input type="checkbox" name="agree" value="1" required>
-          <span>我已阅读并同意：虚拟商品一经售出，非卡密问题不支持退款。</span>
+          <span class="small">我已阅读并同意：虚拟商品售出后，非卡密问题不支持退款。</span>
         </label>
         <button class="btn primary lg block" type="submit" {{if eq .Product.Stock 0}}disabled{{end}}>
           {{template "i_bolt" .}} 立即购买
         </button>
+        <p class="tiny muted center" style="margin:0">下单后 15 分钟内完成支付</p>
       </form>
-    </div>
-    {{if .Product.Description}}
-    <div class="panel-body" style="border-top:1px solid var(--border)">
-      <h4>商品说明</h4>
-      <div class="prose" style="margin-top:8px">{{.Product.Description}}</div>
-    </div>
-    {{end}}
-    <div class="panel-body" style="border-top:1px solid var(--border)">
-      <h4>交付与售后</h4>
-      <ul class="checklist" style="margin-top:10px">
-        <li>{{template "i_bolt" .}} 支付成功后立即自动发货，卡密在订单页展示并同步邮件</li>
-        <li>{{template "i_lock" .}} 卡密加密存储，仅在发货与人工查看时解密</li>
-        <li>{{template "i_shield" .}} 订单凭查询凭证访问，浏览器会话 30 分钟内有效</li>
-      </ul>
-    </div>
-    <div class="panel-body" style="border-top:1px solid var(--border)">
-      <h4>常见问题</h4>
-      <details style="margin-top:10px">
-        <summary style="cursor:pointer;font-weight:600">多久能收到卡密？</summary>
-        <p class="small muted" style="margin-top:8px">支付回调确认后通常在数秒内完成发货；如遇库存不足会转为「已支付待补发」，由管理员处理。</p>
-      </details>
-      <details style="margin-top:8px">
-        <summary style="cursor:pointer;font-weight:600">支付完成后页面没刷新怎么办？</summary>
-        <p class="small muted" style="margin-top:8px">用订单号与查询凭证在「订单查询」中打开订单，或直接刷新订单页。</p>
-      </details>
-      <details style="margin-top:8px">
-        <summary style="cursor:pointer;font-weight:600">支持退款吗？</summary>
-        <p class="small muted" style="margin-top:8px">虚拟商品一经发出不支持无理由退款；若卡密本身无法使用，请联系站长核实处理。</p>
-      </details>
-    </div>
+    </aside>
   </div>
 
   {{if .Related}}
@@ -165,12 +188,13 @@
     {{range .Related}}
     <a class="card product" href="/p/{{.Slug}}">
       <div class="card-head">
-        <div class="name">{{.Name}}</div>
+        <span class="product-icon">{{template "i_box" .}}</span>
         {{if gt .Stock 0}}<span class="badge ok"><span class="dot"></span>有货</span>{{else}}<span class="badge muted">缺货</span>{{end}}
       </div>
+      <div class="name">{{.Name}}</div>
       <div class="card-foot">
         <span class="price">{{money .PriceCents .Currency}}</span>
-        <span class="btn sm primary">查看 {{template "i_arrow_right" .}}</span>
+        <span class="btn sm">查看</span>
       </div>
     </a>
     {{end}}
@@ -201,11 +225,11 @@
         <dt>状态</dt><dd>{{statusText .Order.Status}}</dd>
         <dt>支付截止</dt><dd>{{datetime .Order.ExpiresAt}}</dd>
         {{if .Order.PaidAt}}<dt>支付时间</dt><dd>{{datetime .Order.PaidAt}}</dd>{{end}}
-        <dt>访问凭证</dt><dd><span class="small">{{if .Token}}已通过查询凭证校验{{else}}已通过安全会话授权{{end}}</span></dd>
+        <dt>访问凭证</dt><dd class="small">{{if .Token}}已通过查询凭证校验{{else}}已通过安全会话授权{{end}}</dd>
       </dl>
 
       {{if eq .Order.Status "pending"}}
-      <div style="margin-top:16px">
+      <div style="margin-top:18px">
         <a class="btn primary block lg" href="/order/{{.Order.OrderNo}}/pay">{{template "i_bolt" .}} 去支付</a>
         <p class="muted small center" style="margin-top:10px" data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}">正在等待支付结果…</p>
       </div>
@@ -235,13 +259,13 @@
 {{template "shop_nav" .}}
 <main class="container narrow">
   <div class="panel">
-    <div class="panel-body center" style="padding:34px 24px">
-      <div class="brand-mark" style="margin:0 auto 14px;width:38px;height:38px">{{template "i_bolt" .}}</div>
+    <div class="panel-body center" style="padding:38px 24px">
+      <div class="brand-mark" style="margin:0 auto 16px;width:42px;height:42px">{{template "i_bolt" .}}</div>
       <h2>正在跳转支付</h2>
       <p class="muted small">订单 {{.Order.OrderNo}} · {{money .Order.TotalCents .Order.Currency}}</p>
 
       {{if eq .Action.Kind "form"}}
-        <form id="payform" method="post" action="{{.Action.URL}}" data-autosubmit style="margin-top:18px">
+        <form id="payform" method="post" action="{{.Action.URL}}" data-autosubmit style="margin-top:20px">
           {{range $k, $v := .Action.Fields}}<input type="hidden" name="{{$k}}" value="{{$v}}">{{end}}
           <button class="btn primary lg" type="submit">继续支付 {{template "i_arrow_right" .}}</button>
         </form>
@@ -253,7 +277,7 @@
         <p data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}" class="small">等待确认中…</p>
       {{end}}
 
-      <p style="margin-top:18px"><a class="back" href="/order/{{.Order.OrderNo}}">返回订单详情</a></p>
+      <p style="margin-top:20px"><a class="back" href="/order/{{.Order.OrderNo}}">返回订单详情</a></p>
     </div>
   </div>
 </main>
@@ -266,12 +290,12 @@
 {{template "shop_nav" .}}
 <main class="container narrow">
   <div class="panel">
-    <div class="panel-body center" style="padding:34px 24px">
-      <div class="brand-mark" style="margin:0 auto 14px;width:38px;height:38px">{{template "i_refresh" .}}</div>
+    <div class="panel-body center" style="padding:38px 24px">
+      <div class="brand-mark" style="margin:0 auto 16px;width:42px;height:42px">{{template "i_refresh" .}}</div>
       <h2>支付结果确认中</h2>
       <p class="muted small">订单 {{.Order.OrderNo}}</p>
       <p>支付平台回调可能有数秒延迟，请稍后使用订单号与查询凭证查看结果。</p>
-      <a class="btn primary" href="/query" style="margin-top:12px">前往订单查询 {{template "i_arrow_right" .}}</a>
+      <a class="btn primary" href="/query" style="margin-top:14px">前往订单查询 {{template "i_arrow_right" .}}</a>
     </div>
   </div>
 </main>
@@ -296,7 +320,7 @@
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <label>订单号<input type="text" name="order_no" placeholder="CW20261102-XXXXXX" required autofocus></label>
         <label>查询凭证<input type="text" name="token" placeholder="下单后显示的凭证" required></label>
-        <button class="btn primary block" type="submit">{{template "i_search" .}} 查询订单</button>
+        <button class="btn primary block lg" type="submit">{{template "i_search" .}} 查询订单</button>
       </form>
     </div>
   </div>
@@ -310,10 +334,10 @@
 {{template "shop_nav" .}}
 <main class="container narrow">
   <div class="panel">
-    <div class="panel-body center" style="padding:44px 24px">
+    <div class="panel-body center" style="padding:50px 24px">
       <div class="err-code">{{.Status}}</div>
       <p class="muted">{{.Message}}</p>
-      <a class="btn" href="/" style="margin-top:14px">{{template "i_arrow_left" .}} 返回首页</a>
+      <a class="btn" href="/" style="margin-top:16px">{{template "i_arrow_left" .}} 返回首页</a>
     </div>
   </div>
 </main>
