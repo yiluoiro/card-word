@@ -9,16 +9,21 @@ import (
 	"time"
 
 	"github.com/yiluoiro/card-word/internal/notify"
+	"github.com/yiluoiro/card-word/internal/store"
 )
 
 // handleAdminAuditExport streams the audit trail as CSV.
 func (s *Server) handleAdminAuditExport(w http.ResponseWriter, r *http.Request) {
 	action := strings.TrimSpace(r.URL.Query().Get("action"))
-	entries, err := s.db.ListAudit(r.Context(), action, exportRowLimit, 0)
+	view := listView(r, "audit", "")
+	view.Filter.Size = exportRowLimit
+	view.Filter.Page = 1
+	raw, _, err := s.db.AdminList(r.Context(), "audit", view.Filter)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "导出失败。")
 		return
 	}
+	entries := raw.([]store.AuditEntry)
 	filename := fmt.Sprintf("audit-%s.csv", time.Now().Format("20060102-1504"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
@@ -29,10 +34,10 @@ func (s *Server) handleAdminAuditExport(w http.ResponseWriter, r *http.Request) 
 	defer cw.Flush()
 	_ = cw.Write([]string{"时间", "操作者", "动作", "对象", "IP", "详情"})
 	for _, e := range entries {
-		_ = cw.Write([]string{
+		_ = cw.Write(csvTextRow([]string{
 			e.CreatedAt.Local().Format("2006-01-02 15:04:05"),
 			e.Actor, e.Action, e.Target, e.IP, e.Detail,
-		})
+		}))
 	}
 	s.audit(r, "audit.export", "", fmt.Sprintf("rows=%d action=%q", len(entries), action))
 }

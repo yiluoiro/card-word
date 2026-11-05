@@ -1,91 +1,48 @@
-{{define "home"}}{{template "head" .}}
-<body>
+{{define "home"}}{{if .ShopCustomized}}{{template "custom_home" .}}{{else}}{{template "classic_home" .}}{{end}}{{end}}
+{{define "classic_home"}}{{template "head" .}}
+<body class="store-page reference-store">
 {{template "shop_nav" .}}
-<main class="container">
-  {{if .Site.Notice}}<div class="alert info">{{template "i_info" .}}<div>{{.Site.Notice}}</div></div>{{end}}
-  {{if .Site.Maintenance}}<div class="alert warn">{{template "i_alert" .}}<div>站点维护中，下单与支付可能暂不可用。</div></div>{{end}}
-
-  <section class="hero">
+<main class="storefront" id="main-content">
+  <div class="store-notices">{{if .AppearancePreview}}<div class="alert info" role="status">正在预览未发布的装修效果。保存并发布后访客才会看到修改。</div>{{end}}{{if .Site.Notice}}<div class="alert info">{{template "i_info" .}}<div>{{.Site.Notice}}</div></div>{{end}}{{if .Site.Maintenance}}<div class="alert warn">站点维护中，下单与支付可能暂不可用。</div>{{end}}</div>
+  <section class="hero reference-hero">
     <div class="hero-inner">
-      <span class="eyebrow">{{template "i_bolt" .}} 自动发货 · 全天候在线</span>
-      <h1>{{.Site.Name}}<br>把交付做成一瞬间</h1>
-      <p>{{.Site.Tagline}}</p>
-      <div class="hero-actions">
-        <a class="btn primary lg" href="#products">浏览商品 {{template "i_arrow_right" .}}</a>
-        <a class="btn lg" href="/query">{{template "i_receipt" .}} 查询订单</a>
-      </div>
-      <div class="hero-stats">
-        <div class="hero-stat"><div class="k">平均发货</div><div class="v">秒级</div></div>
-        <div class="hero-stat"><div class="k">卡密存储</div><div class="v">AES-256<small>加密</small></div></div>
-        <div class="hero-stat"><div class="k">自动化</div><div class="v">24/7<small>无人值守</small></div></div>
-      </div>
+      <h1>{{.Site.Name}}</h1>
+      {{if .ShopCustomized}}<h2>{{.Appearance.Headline}}</h2><p>{{.Site.Tagline}}</p>{{else}}<h2 data-en="Digital Gift Cards" data-zh="数字礼品卡">Digital Gift Cards</h2><p data-en="Choose a product and check its region and redemption instructions before ordering." data-zh="选购前，请确认商品适用地区和兑换方式。">Choose a product and check its region and redemption instructions before ordering.</p>{{end}}
+      <div class="hero-actions"><a class="btn primary lg" href="#products"><span data-en="Browse Cards" data-zh="浏览商品">Browse Cards</span>{{template "i_arrow_right" .}}</a></div>
+    </div>
+    <div class="hero-art"><img src="/static/reference/hero-cards.webp" width="922" height="414" alt="OpenAI, Google Play, Steam and PlayStation digital cards" fetchpriority="high"></div>
+  </section>
+  <section class="benefits" aria-label="Shopping benefits">
+    <div class="benefit"><span class="benefit-icon">{{template "i_bolt" .}}</span><div><h3 data-en="Digital Delivery" data-zh="数字交付">Digital Delivery</h3><p data-en="Codes delivered after payment confirmation" data-zh="付款确认后，在订单中领取卡密">Codes delivered after payment confirmation</p></div></div>
+    <div class="benefit"><span class="benefit-icon">{{template "i_shield" .}}</span><div><h3 data-en="Card Code Storage" data-zh="卡密保管">Card Code Storage</h3><p data-en="Protected orders and encrypted card codes" data-zh="订单凭证校验，卡密加密保存">Protected orders and encrypted card codes</p></div></div>
+    <div class="benefit"><span class="benefit-icon">{{template "i_headphones" .}}</span><div><h3 data-en="Order Support" data-zh="订单支持">Order Support</h3><p data-en="Check payment and delivery status" data-zh="随时查询订单，跟进交付状态">Check payment and delivery status</p></div></div>
+    <div class="benefit"><span class="benefit-icon">{{template "i_tag" .}}</span><div><h3 data-en="Clear Pricing" data-zh="价格透明">Clear Pricing</h3><p data-en="Know your total before you pay" data-zh="付款前可查看订单总额">Know your total before you pay</p></div></div>
+  </section>
+  <section class="popular-section section-shell" id="popular">
+    <div class="section-heading"><h2 data-en="Popular Cards" data-zh="热门品牌">Popular Cards</h2><a href="#products" class="view-all"><span data-en="View All" data-zh="查看全部">View All</span>{{template "i_arrow_right" .}}</a></div>
+    <div class="brand-grid">
+      {{range .BrandCards}}<a class="brand-card" href="/?q={{.Query}}#products"><img src="/static/reference/{{.Image}}.webp" width="234" height="124" alt="{{.Name}}" loading="lazy"><h3>{{.Name}}</h3><span class="btn primary"><span data-en="Browse Cards" data-zh="查看商品">Browse Cards</span>{{template "i_arrow_right" .}}</span></a>{{end}}
     </div>
   </section>
-
-  <div class="steps">
-    <div class="step"><div class="n">1</div><h3>挑选商品</h3><p>按分类筛选，查看实时库存与价格。</p></div>
-    <div class="step"><div class="n">2</div><h3>完成支付</h3><p>支持易支付网关与人工确认，订单 15 分钟内有效。</p></div>
-    <div class="step"><div class="n">3</div><h3>领取卡密</h3><p>支付回调后自动发货，卡密在订单页与邮件中可见。</p></div>
-  </div>
-
-  <div id="products"></div>
-  <div class="search-row">
-    <form class="search" method="get" action="/" role="search">
-      {{if .ActiveCat}}<input type="hidden" name="cat" value="{{.ActiveCat.Slug}}">{{end}}
-      <span class="search-icon">{{template "i_search" .}}</span>
-      <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或关键字" aria-label="搜索商品">
-      <button class="btn primary" type="submit">搜索</button>
-    </form>
-    {{if or .Search .ActiveCat}}<a class="btn ghost" href="/">清除筛选</a>{{end}}
-  </div>
-
-  {{if .Categories}}
-  <div class="segmented">
-    <a class="{{if not .ActiveCat}}active{{end}}" href="/{{if .Search}}?q={{.Search}}{{end}}">全部</a>
-    {{range .Categories}}
-    <a class="{{if and $.ActiveCat (eq $.ActiveCat.Slug .Slug)}}active{{end}}" href="/?cat={{.Slug}}{{if $.Search}}&q={{$.Search}}{{end}}">{{.Name}}</a>
-    {{end}}
-  </div>
-  {{end}}
-
-  {{if .Products}}
-  <div class="grid">
-    {{range .Products}}
-    <a class="card product" href="/p/{{.Slug}}">
-      {{if .CoverPath}}<img class="product-cover" src="/media/{{.CoverPath}}" alt="{{.Name}}" loading="lazy">{{end}}
-      <div class="card-head">
-        <span class="product-icon">{{template "i_box" .}}</span>
-        {{if gt .Stock 0}}
-          <span class="badge ok"><span class="dot"></span>有货</span>
-        {{else}}
-          <span class="badge muted">缺货</span>
-        {{end}}
-      </div>
-      <div>
-        <div class="name">{{.Name}}</div>
-        <div class="desc">{{if .Summary}}{{.Summary}}{{else}}支付后自动发货，卡密即时可见{{end}}</div>
-      </div>
-      <div class="card-foot">
-        <span class="price">{{money .PriceCents .Currency}}</span>
-        <span class="btn sm primary">购买 {{template "i_arrow_right" .}}</span>
-      </div>
-    </a>
-    {{end}}
-  </div>
-  {{else}}
-  <div class="empty">
-    {{template "i_box" .}}
-    <div class="title">暂时没有在售商品</div>
-    <div>站长正在补货，请稍后再来。</div>
-  </div>
-  {{end}}
-</main>
-{{template "footer" .}}
-</body>
-</html>{{end}}
-
+  <section class="catalog-section section-shell" id="products">
+    <div class="section-heading"><div>{{if .ShopCustomized}}<h2>{{.Appearance.CatalogTitle}}</h2><p>{{.Appearance.CatalogDescription}}</p>{{else}}<h2 data-en="Products" data-zh="在售商品">Products</h2>{{end}}</div><span class="catalog-count">{{.Pagination.Total}} <span data-en="products" data-zh="件商品">products</span></span></div>
+    <div class="catalog-toolbar"><form class="search" method="get" action="/#products" role="search">{{if .ActiveCat}}<input type="hidden" name="cat" value="{{.ActiveCat.Slug}}">{{end}}<span class="search-icon">{{template "i_search" .}}</span><input type="search" name="q" value="{{.Search}}" placeholder="Search for gift cards..." data-en-placeholder="Search for gift cards..." data-zh-placeholder="搜索商品名称或关键词…" aria-label="Search products"><button class="btn primary" type="submit" aria-label="搜索商品">{{template "i_search" .}}</button></form>{{if or .Search .ActiveCat}}<a class="btn ghost" href="/#products" data-en="Clear Filters" data-zh="清除筛选">Clear Filters</a>{{end}}</div>
+    {{if .Categories}}<nav class="segmented" aria-label="商品分类"><a class="{{if not .ActiveCat}}active{{end}}" href="/{{if .Search}}?q={{.Search}}{{end}}#products" data-en="All Cards" data-zh="全部商品">All Cards</a>{{range .Categories}}<a class="{{if and $.ActiveCat (eq $.ActiveCat.Slug .Slug)}}active{{end}}" href="/?cat={{.Slug}}{{if $.Search}}&q={{$.Search}}{{end}}#products">{{.Name}}</a>{{end}}</nav>{{end}}
+    {{if .Products}}<div class="grid catalog-grid">{{range .Products}}<a class="card product" href="/p/{{.Slug}}"><div class="product-visual">{{if .CoverPath}}<img class="product-cover" src="/media/{{.CoverPath}}" alt="{{.Name}}" loading="lazy">{{else}}{{if brandImage .Name}}<img class="product-cover brand-cover" src="/static/reference/{{brandImage .Name}}.webp" alt="{{.Name}}" loading="lazy">{{else}}<span class="gift-card-art"><span>{{template "i_logo" .}}</span><b>GIFT CARD</b><small>{{.Currency}} / DIGITAL EDITION</small></span>{{end}}{{end}}</div><div class="card-head"><span class="product-category">{{if .CategoryName}}{{.CategoryName}}{{else}}<span data-en="Digital Goods" data-zh="数字商品">Digital Goods</span>{{end}}</span>{{if gt .Stock 0}}<span class="badge ok"><span class="dot"></span><span data-en="In Stock" data-zh="有货">In Stock</span></span>{{else}}<span class="badge muted" data-en="Sold Out" data-zh="缺货">Sold Out</span>{{end}}</div><div><div class="name">{{.Name}}</div><div class="desc">{{if .Summary}}{{mdExcerpt .Summary}}{{else}}<span data-en="Your code is available after payment confirmation." data-zh="付款确认后，在订单详情领取卡密。">Your code is available after payment confirmation.</span>{{end}}</div></div><div class="card-foot"><span class="price">{{money .PriceCents .Currency}}{{if .HasVariants}}<small data-en=" from" data-zh=" 起"> 起</small>{{end}}</span><span class="btn primary sm"><span data-en="View Card" data-zh="查看商品">View Card</span>{{template "i_arrow_right" .}}</span></div></a>{{end}}</div>{{else}}<div class="empty">{{template "i_search" .}}<h3 data-en="No matching cards yet" data-zh="暂未找到匹配商品">No matching cards yet</h3><p data-en="Try another keyword or browse the full collection." data-zh="试试其他关键词，或查看全部在售商品。">Try another keyword or browse the full collection.</p><a class="btn primary" href="/#products" data-en="Browse All Cards" data-zh="浏览全部商品">Browse All Cards</a></div>{{end}}
+    {{template "list_pager" .Pagination}}
+  </section>
+  <section class="about-section section-shell" id="about"><div class="about-art" aria-hidden="true">{{template "i_logo" .}}<span>Digital<br>Gift Cards</span></div><div><span class="overline" data-en="ABOUT CARD WORD" data-zh="关于 CARD WORD">ABOUT CARD WORD</span><h2 data-en="How to Access Your Codes" data-zh="下单后如何查卡密">How to Access Your Codes</h2><p data-en="After payment is confirmed, open your order to view the codes. Save your order number and query credential to look them up later." data-zh="付款确认后，在订单详情查看卡密。请保存订单号和查询凭证，以便之后查询。">After payment is confirmed, open your order to view the codes. Save your order number and query credential to look them up later.</p><a href="/query" class="text-link"><span data-en="Track Your Order" data-zh="查询我的订单">Track Your Order</span>{{template "i_arrow_right" .}}</a></div></section>
+  <section class="faq-section section-shell" id="faq"><div class="section-heading"><div><span class="overline">HERE TO HELP</span><h2 data-en="Frequently Asked Questions" data-zh="常见问题">Frequently Asked Questions</h2></div></div><div class="faq-grid">
+    <details><summary data-en="How will I receive my card?" data-zh="购买后如何领取卡密？">How will I receive my card?</summary><p data-en="Once payment is confirmed, open your order to view your codes. Manual payments require the store to confirm receipt. Orders awaiting stock are delivered after replenishment." data-zh="付款确认后，在订单详情领取卡密。人工付款需要等待店主确认；遇到库存不足，订单会等待补货后交付。">Once payment is confirmed, open your order to view your codes. Manual payments require the store to confirm receipt. Orders awaiting stock are delivered after replenishment.</p></details>
+    <details><summary data-en="Do I need an account to order?" data-zh="必须注册账号才能购买吗？">Do I need an account to order?</summary><p data-en="You can check out as a guest. Save your order number and query credential. Purchases made while signed in also appear in your account." data-zh="支持游客购买，请保存订单号与查询凭证。登录后创建的订单也会自动出现在用户中心。">You can check out as a guest. Save your order number and query credential. Purchases made while signed in also appear in your account.</p></details>
+    <details><summary data-en="Where can I check my order?" data-zh="如何查询订单进度？">Where can I check my order?</summary><p data-en="Use Track Order with the order number and query credential you received after checkout. Never share your credentials with others." data-zh="进入订单查询，输入下单后获得的订单号与查询凭证。请勿向他人分享凭证。">Use Track Order with the order number and query credential you received after checkout. Never share your credentials with others.</p><a href="/query" data-en="Track Order →" data-zh="前往订单查询 →">Track Order →</a></details>
+    <details><summary data-en="What if I have a problem with my code?" data-zh="卡密使用有问题怎么办？">What if I have a problem with my code?</summary><p data-en="Check the product instructions and any regional restrictions first. If the issue persists, contact the seller with your order number." data-zh="请先核对商品说明、使用方式与地区限制。如仍有问题，请提供订单号联系商家。">Check the product instructions and any regional restrictions first. If the issue persists, contact the seller with your order number.</p><a href="#contact" data-en="Contact the Seller →" data-zh="联系商家 →">Contact the Seller →</a></details>
+  </div></section>
+  <section class="contact-section section-shell" id="contact"><div><span class="overline" data-en="CONTACT" data-zh="联系与支持">CONTACT</span><h2 data-en="Need a hand with your order?" data-zh="订单需要帮助？">Need a hand with your order?</h2>{{if .Site.Contact}}<p>{{.Site.Contact}}</p>{{else}}<p data-en="The seller has not added contact details yet. Please confirm payment instructions before placing an order." data-zh="商家暂未填写联系方式，请在下单前确认付款说明。">The seller has not added contact details yet. Please confirm payment instructions before placing an order.</p>{{end}}</div><a class="btn primary lg" href="/query"><span data-en="Track Order" data-zh="查询订单">Track Order</span>{{template "i_arrow_right" .}}</a></section>
+</main>{{template "footer" .}}
+</body></html>{{end}}
 {{define "product"}}{{template "head" .}}
-<body>
+<body class="product-page">
 {{template "shop_nav" .}}
 <main class="container">
   {{template "flash" .}}
@@ -96,19 +53,20 @@
       <div class="panel">
         <div class="panel-head">
           <div>
-            <h2>{{.Product.Name}}</h2>
-            <div class="panel-sub">{{if .Product.CategoryName}}{{.Product.CategoryName}} · {{end}}即时自动发货</div>
+            <h1 class="product-title">{{.Product.Name}}</h1>
+            <div class="panel-sub">{{if .Product.CategoryName}}{{.Product.CategoryName}} · {{end}}付款确认后交付</div>
           </div>
           {{if gt .Product.Stock 0}}
-            <span class="badge ok"><span class="dot"></span>库存 {{.Product.Stock}}</span>
+            <span class="badge ok"><span class="dot"></span><span data-variant-stock>库存 {{.Product.Stock}}</span></span>
           {{else}}
             <span class="badge muted">暂时缺货</span>
           {{end}}
         </div>
         <div class="panel-body">
-          {{if .Product.Summary}}<p class="muted">{{.Product.Summary}}</p>{{end}}
+          {{if .Product.CoverPath}}<img class="product-detail-cover" src="/media/{{.Product.CoverPath}}" alt="{{.Product.Name}}">{{end}}
+          {{if .Product.Summary}}<div class="markdown-body product-summary">{{markdown .Product.Summary}}</div>{{end}}
           {{if .Product.Description}}
-          <div class="prose" style="margin-top:12px">{{.Product.Description}}</div>
+          <div class="markdown-body product-description">{{markdown .Product.Description}}</div>
           {{end}}
         </div>
       </div>
@@ -117,9 +75,9 @@
         <div class="panel-head"><h3>交付与售后</h3></div>
         <div class="panel-body">
           <ul class="checklist">
-            <li>{{template "i_bolt" .}} 支付成功后立即自动发货，卡密在订单页展示并同步邮件</li>
-            <li>{{template "i_lock" .}} 卡密加密存储，仅在发货与人工查看时解密</li>
-            <li>{{template "i_shield" .}} 订单凭查询凭证访问，浏览器会话 30 分钟内有效</li>
+            <li>{{template "i_bolt" .}} 付款确认后在订单页领取卡密；人工支付需等待管理员确认</li>
+            <li>{{template "i_lock" .}} 妥善保存订单号与查询凭证，方便随时回来查看</li>
+            <li>{{template "i_shield" .}} 如有使用问题，请提供订单号联系客服{{if .Site.Contact}}：{{.Site.Contact}}{{end}}</li>
           </ul>
         </div>
       </div>
@@ -129,7 +87,7 @@
         <div class="panel-body">
           <details>
             <summary style="cursor:pointer;font-weight:620">多久能收到卡密？</summary>
-            <p class="small muted" style="margin-top:8px">支付回调确认后通常在数秒内完成发货；如遇库存不足会转为「已支付待补发」，由管理员处理。</p>
+            <p class="small muted" style="margin-top:8px">人工付款需等待商家确认到账，确认后在订单中领取卡密。如遇库存不足会转为「已支付待补发」，由商家处理。</p>
           </details>
           <details style="margin-top:10px">
             <summary style="cursor:pointer;font-weight:620">支付完成后页面没刷新怎么办？</summary>
@@ -143,46 +101,60 @@
       </div>
     </div>
 
-    <aside class="buy-card">
+    <aside class="buy-card" id="purchase" tabindex="-1" aria-label="填写订单">
       <div class="small muted">单价</div>
-      <div class="price-lg">{{money .Product.PriceCents .Product.Currency}}</div>
-      <p class="small muted" style="margin-bottom:18px">库存 {{.Product.Stock}} · {{if eq .Product.Stock 0}}暂时缺货{{else}}支付后自动发货{{end}}</p>
+      <div class="price-lg" data-variant-price>{{money .Product.PriceCents .Product.Currency}}</div>
+      <p class="small muted" style="margin-bottom:18px"><span data-variant-stock>库存 {{.Product.Stock}}</span> · {{if eq .Product.Stock 0}}暂时缺货{{else}}付款确认后交付{{end}}</p>
 
       <form method="post" action="/checkout" class="form">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <input type="hidden" name="product_id" value="{{.Product.ID}}">
-        <input type="hidden" name="idem" value="{{.CSRF}}{{.Product.ID}}">
+        <input type="hidden" name="idem" value="{{.IdempotencyKey}}">
 
-        <div class="row">
-          <label>数量
-            <input type="number" name="quantity" value="{{.Product.MinQty}}" min="{{.Product.MinQty}}" max="{{.Product.MaxQty}}" required>
-          </label>
-          <label>支付方式
-            <select name="driver">
-              {{range .Drivers}}<option value="{{.Name}}">{{.Title}}</option>{{end}}
-            </select>
-          </label>
-        </div>
-        <label>接收卡密的邮箱（可选）
-          <input type="email" name="email" placeholder="you@example.com" autocomplete="email">
+        {{if .Variants}}<label>选择规格<select name="variant_id" required data-product-variant data-max-qty="{{.Product.MaxQty}}" data-ready="{{.PurchaseReady}}">{{range .Variants}}<option value="{{.ID}}" data-price="{{.PriceCents}}" data-price-text="{{money .PriceCents $.Product.Currency}}" data-stock="{{.Stock}}" {{if lt .Stock $.Product.MinQty}}disabled{{end}} {{if eq $.SelectedVariant .ID}}selected{{end}}>{{.Name}} · {{money .PriceCents $.Product.Currency}} · 库存 {{.Stock}}</option>{{end}}</select></label><noscript><p>选择规格后可提交订单，实际价格以订单确认页为准。</p></noscript>{{end}}
+        <label>数量
+          <input type="number" name="quantity" value="{{.PurchaseQuantity}}" min="{{.Product.MinQty}}" max="{{.MaxQuantity}}" required {{if not .CanBuy}}disabled{{end}}>
+        </label>
+        <fieldset class="payment-methods" {{if not .CanBuy}}disabled{{end}}>
+          <legend>支付方式</legend>
+          <div class="payment-options">
+            {{range $i, $driver := .Drivers}}
+            <label class="payment-option">
+              <input type="radio" name="driver" value="{{.Name}}" {{if or (eq $.PurchaseDriver .Name) (and (not $.PurchaseDriver) (eq $i 0))}}checked{{end}} required>
+              <span class="payment-option-card">
+                <span class="payment-option-icon pay-{{.Icon}}" aria-hidden="true">{{if eq .Icon "alipay"}}{{template "pay_alipay" .}}{{else}}{{if eq .Icon "wechat"}}{{template "pay_wechat" .}}{{else}}{{if eq .Icon "qq"}}{{template "pay_qq" .}}{{else}}{{if eq .Icon "usdt"}}{{template "pay_usdt" .}}{{else}}{{if eq .Icon "paypal"}}{{template "pay_paypal" .}}{{else}}{{if eq .Icon "receipt"}}{{template "i_receipt" .}}{{else}}{{template "i_wallet" .}}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}</span>
+                <span class="payment-option-title"{{if eq .Icon "alipay"}} data-en="Alipay" data-zh="支付宝"{{else}}{{if eq .Icon "wechat"}} data-en="WeChat Pay" data-zh="微信支付"{{else}}{{if eq .Icon "qq"}} data-en="QQ Wallet" data-zh="QQ 钱包"{{else}}{{if eq .Icon "receipt"}} data-en="Manual payment" data-zh="人工付款"{{end}}{{end}}{{end}}{{end}}>{{.Title}}</span>{{if .Via}}<small data-zh="易支付" data-en="EPay">易支付</small>{{end}}
+              </span>
+            </label>
+            {{end}}
+          </div>
+        </fieldset>
+        <p class="small muted">{{if .Customer}}本订单将保存至 <a href="/account">{{.Customer.Username}} 的用户中心</a>。{{else}}当前为游客购买。<a href="/account/login">登录后购买</a>可在用户中心查看订单；游客订单请保存查询凭证。{{end}}</p>
+        <label>订单通知邮箱（可选）
+          <input type="email" name="email" value="{{.PurchaseEmail}}" placeholder="you@example.com" autocomplete="email">
+          <span class="hint">{{if .EmailNotifications}}店铺已配置邮件通知；请同时保存订单查询凭证。{{else}}当前店铺未开通邮件通知，请在订单详情领取卡密并保存查询凭证。{{end}}</span>
         </label>
         <label>联系方式（可选）
-          <input type="text" name="contact" placeholder="QQ / TG / 微信" autocomplete="off">
+          <input type="text" name="contact" value="{{.PurchaseContact}}" placeholder="QQ / TG / 微信" autocomplete="off">
         </label>
         <label>优惠码（可选）
-          <input type="text" name="coupon" placeholder="SAVE10" autocomplete="off">
+          <input type="text" name="coupon" value="{{.PurchaseCoupon}}" placeholder="输入优惠码（如有）" autocomplete="off">
         </label>
+        <div class="purchase-total" data-purchase-total data-unit-cents="{{.Product.PriceCents}}" data-currency-symbol="{{.CurrencySymbol}}" hidden><span>商品小计（优惠前）</span><output aria-live="polite"></output><small>优惠金额将在订单中确认。</small></div>
         <label class="checkbox">
-          <input type="checkbox" name="agree" value="1" required>
+          <input type="checkbox" name="agree" value="1" {{if .PurchaseAgreed}}checked{{end}} required>
           <span class="small">我已阅读并同意：虚拟商品售出后，非卡密问题不支持退款。</span>
         </label>
-        <button class="btn primary lg block" type="submit" {{if eq .Product.Stock 0}}disabled{{end}}>
-          {{template "i_bolt" .}} 立即购买
+        {{if .Challenge}}{{template "captcha_field" .}}{{end}}
+        <button class="btn primary lg block" type="submit" {{if not .CanBuy}}disabled{{end}}>
+          {{template "i_bolt" .}} {{if .PurchaseBlockedReason}}{{.PurchaseBlockedReason}}{{else}}{{if .CanBuy}}立即购买{{else}}库存不足，暂不可购买{{end}}{{end}}
         </button>
-        <p class="tiny muted center" style="margin:0">下单后 15 分钟内完成支付</p>
+        <p class="tiny muted center" style="margin:0">请在下单后 {{.OrderTTLMinutes}} 分钟内完成支付</p>
       </form>
     </aside>
   </div>
+
+  <div class="mobile-purchase" data-purchase-shortcut><div><span class="small muted">单价</span><strong data-variant-price>{{money .Product.PriceCents .Product.Currency}}</strong></div>{{if .CanBuy}}<a class="btn primary" href="#purchase">填写订单 {{template "i_arrow_right" .}}</a>{{else}}<span class="badge muted">暂不可购买</span>{{end}}</div>
 
   {{if .Related}}
   <h3 class="section-title">同类商品</h3>
@@ -196,7 +168,7 @@
       </div>
       <div class="name">{{.Name}}</div>
       <div class="card-foot">
-        <span class="price">{{money .PriceCents .Currency}}</span>
+        <span class="price">{{money .PriceCents .Currency}}{{if .HasVariants}}<small data-en=" from" data-zh=" 起"> 起</small>{{end}}</span>
         <span class="btn sm">查看</span>
       </div>
     </a>
@@ -207,7 +179,6 @@
 {{template "footer" .}}
 </body>
 </html>{{end}}
-
 {{define "order"}}{{template "head" .}}
 <body>
 {{template "shop_nav" .}}
@@ -216,25 +187,27 @@
   <div class="panel">
     <div class="panel-head">
       <div>
-        <h2>订单 {{.Order.OrderNo}}</h2>
+        <h1 class="page-title">订单 {{.Order.OrderNo}}</h1>
         <div class="panel-sub">创建于 {{datetime .Order.CreatedAt}}</div>
       </div>
-      <span class="badge {{statusClass .Order.Status}}">{{statusText .Order.Status}}</span>
+      <span class="badge {{statusClass .Order.Status}}"><span data-admin-i18n>{{statusText .Order.Status}}</span></span>
     </div>
     <div class="panel-body">
       <dl class="kv">
-        <dt>商品</dt><dd>{{.Order.ProductName}} × {{.Order.Quantity}}</dd>
+        <dt>商品</dt><dd>{{.Order.ProductName}}{{if .Order.VariantName}} · {{.Order.VariantName}}{{end}} × {{.Order.Quantity}}</dd>
         <dt>金额</dt><dd><strong>{{money .Order.TotalCents .Order.Currency}}</strong>{{if gt .Order.DiscountCents 0}} <span class="muted small">（已优惠 {{money .Order.DiscountCents .Order.Currency}}）</span>{{end}}</dd>
-        <dt>状态</dt><dd>{{statusText .Order.Status}}</dd>
+        <dt>状态</dt><dd><span data-admin-i18n>{{statusText .Order.Status}}</span></dd>
         <dt>支付截止</dt><dd>{{datetime .Order.ExpiresAt}}</dd>
         {{if .Order.PaidAt}}<dt>支付时间</dt><dd>{{datetime .Order.PaidAt}}</dd>{{end}}
         <dt>访问凭证</dt><dd class="small">{{if .Token}}已通过查询凭证校验{{else}}已通过安全会话授权{{end}}</dd>
       </dl>
+      {{if .Token}}<section class="credential-box"><div class="card-head"><div><h3>请保存你的查询凭证</h3><p class="small muted">用于在其他设备查询订单，请勿分享给他人。</p></div><button class="btn sm" type="button" data-copy-all="#order-credential">{{template "i_copy" .}} 复制</button></div><div id="order-credential"><code>{{.Order.OrderNo}}</code><code>{{.Token}}</code></div></section>{{end}}
+      {{if eq .Order.Status "paid"}}<div class="alert info" data-poll="{{.Order.OrderNo}}" data-status="paid">付款已确认，正在等待补发。发货后此页面会自动更新。</div>{{end}}
 
       {{if eq .Order.Status "pending"}}
       <div style="margin-top:18px">
         <a class="btn primary block lg" href="/order/{{.Order.OrderNo}}/pay">{{template "i_bolt" .}} 去支付</a>
-        <p class="muted small center" style="margin-top:10px" data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}">正在等待支付结果…</p>
+        <p class="muted small center" style="margin-top:10px" data-poll="{{.Order.OrderNo}}">正在等待支付结果…</p>
       </div>
       {{end}}
 
@@ -247,7 +220,7 @@
         <ul class="keys" id="keys">
           {{range .Cards}}<li><code>{{.Secret}}</code></li>{{end}}
         </ul>
-        <p class="muted small">请立即保存。本页面链接即凭证，泄露可能导致卡密被他人取走。</p>
+        <p class="muted small">请妥善保存卡密及查询凭证，勿将含凭证的订单链接分享给他人。</p>
       </div>
       {{end}}
     </div>
@@ -256,7 +229,6 @@
 {{template "footer" .}}
 </body>
 </html>{{end}}
-
 {{define "pay"}}{{template "head" .}}
 <body>
 {{template "shop_nav" .}}
@@ -264,7 +236,7 @@
   <div class="panel">
     <div class="panel-body center" style="padding:38px 24px">
       <div class="brand-mark" style="margin:0 auto 16px;width:42px;height:42px">{{template "i_bolt" .}}</div>
-      <h2>正在跳转支付</h2>
+      <h1 class="page-title">{{if or (eq .Action.Kind "inline") (eq .Action.Kind "qr")}}完成付款{{else}}正在跳转支付{{end}}</h1>
       <p class="muted small">订单 {{.Order.OrderNo}} · {{money .Order.TotalCents .Order.Currency}}</p>
 
       {{if eq .Action.Kind "form"}}
@@ -272,13 +244,16 @@
           {{range $k, $v := .Action.Fields}}<input type="hidden" name="{{$k}}" value="{{$v}}">{{end}}
           <button class="btn primary lg" type="submit">继续支付 {{template "i_arrow_right" .}}</button>
         </form>
-      {{else if eq .Action.Kind "redirect"}}
+      {{else}}{{if eq .Action.Kind "redirect"}}
         <p data-redirect="{{.Action.URL}}" style="margin-top:16px">若未自动跳转，请 <a href="{{.Action.URL}}" rel="noopener">点击这里继续</a>。</p>
+      {{else}}{{if eq .Action.Kind "qr"}}
+        <img class="payment-qr" src="{{.QRImage}}" alt="微信支付二维码" width="256" height="256">
+        <p>{{.Action.Message}}</p><p class="hint">请在订单有效期内完成付款，请勿重复支付。</p><p data-poll="{{.Order.OrderNo}}" data-pay-page class="small">等待付款中…</p>
       {{else}}
         <pre class="inline-msg" style="margin-top:16px">{{.Action.Message}}</pre>
         <p class="muted small">完成付款后请联系站长确认，订单状态会自动更新。</p>
-        <p data-poll="{{.Order.OrderNo}}" data-token="{{.Token}}" class="small">等待确认中…</p>
-      {{end}}
+        <p data-poll="{{.Order.OrderNo}}" data-pay-page class="small">等待确认中…</p>
+      {{end}}{{end}}{{end}}
 
       <p style="margin-top:20px"><a class="back" href="/order/{{.Order.OrderNo}}">返回订单详情</a></p>
     </div>
@@ -287,7 +262,6 @@
 {{template "footer" .}}
 </body>
 </html>{{end}}
-
 {{define "pay_pending"}}{{template "head" .}}
 <body>
 {{template "shop_nav" .}}
@@ -295,7 +269,7 @@
   <div class="panel">
     <div class="panel-body center" style="padding:38px 24px">
       <div class="brand-mark" style="margin:0 auto 16px;width:42px;height:42px">{{template "i_refresh" .}}</div>
-      <h2>支付结果确认中</h2>
+      <h1 class="page-title">支付结果确认中</h1>
       <p class="muted small">订单 {{.Order.OrderNo}}</p>
       <p>支付平台回调可能有数秒延迟，请稍后使用订单号与查询凭证查看结果。</p>
       <a class="btn primary" href="/query" style="margin-top:14px">前往订单查询 {{template "i_arrow_right" .}}</a>
@@ -305,7 +279,6 @@
 {{template "footer" .}}
 </body>
 </html>{{end}}
-
 {{define "query"}}{{template "head" .}}
 <body>
 {{template "shop_nav" .}}
@@ -314,15 +287,16 @@
   <div class="panel">
     <div class="panel-head">
       <div>
-        <h2>订单查询</h2>
+        <h1 class="page-title">订单查询</h1>
         <div class="panel-sub">输入订单号与下单时获得的查询凭证</div>
       </div>
     </div>
     <div class="panel-body">
       <form method="post" action="/query" class="form">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>订单号<input type="text" name="order_no" placeholder="CW20261102-XXXXXX" required autofocus></label>
+        <label>订单号<input type="text" name="order_no" value="{{.OrderNo}}" placeholder="CW20261102-XXXXXX" required autofocus></label>
         <label>查询凭证<input type="text" name="token" placeholder="下单后显示的凭证" required></label>
+        {{template "captcha_field" .}}
         <button class="btn primary block lg" type="submit">{{template "i_search" .}} 查询订单</button>
       </form>
     </div>
@@ -331,59 +305,63 @@
 {{template "footer" .}}
 </body>
 </html>{{end}}
-
 {{define "error"}}{{template "head" .}}
-<body>
-{{template "shop_nav" .}}
-<main class="container narrow">
-  <div class="panel">
-    <div class="panel-body center" style="padding:50px 24px">
-      <div class="err-code">{{.Status}}</div>
-      <p class="muted">{{.Message}}</p>
-      <a class="btn" href="/" style="margin-top:16px">{{template "i_arrow_left" .}} 返回首页</a>
-    </div>
-  </div>
-</main>
-{{template "footer" .}}
-</body>
-</html>{{end}}
-
+{{if and .User .Path (hasPrefix .Path "/admin")}}
+<body class="app">{{template "admin_sidebar" .}}<div class="main">{{template "admin_topbar" .}}<main class="content narrow">
+<div class="page-head"><div class="titles"><h1 data-admin-i18n>暂时无法完成操作</h1></div></div>
+{{template "error_content" .}}</main></div></body></html>
+{{else}}
+<body>{{template "shop_nav" .}}<main class="container narrow">{{template "error_content" .}}</main>{{template "footer" .}}</body></html>
+{{end}}{{end}}
+{{define "error_content"}}
+<section class="panel"><div class="panel-body center status-content">
+<p class="err-code">{{.Status}}</p>
+{{if and .User .Path (hasPrefix .Path "/admin")}}<h2 data-admin-i18n>请检查当前操作权限或稍后重试</h2>{{else}}<h1>{{if eq .Status 404}}页面未找到{{else}}{{if eq .Status 503}}暂时休息一下{{else}}暂时无法完成操作{{end}}{{end}}</h1>{{end}}
+<p class="muted">{{.Message}}</p>
+{{if and .User .Path (hasPrefix .Path "/admin")}}
+<a class="btn" href="/admin">{{template "i_arrow_left" .}} <span data-admin-i18n>返回概览</span></a>
+{{else}}<a class="btn" href="/">{{template "i_arrow_left" .}} 返回首页</a>{{end}}
+</div></section>{{end}}
 {{define "admin_login"}}{{template "head" .}}
-<body class="auth">
+<body class="auth admin-auth"><div class="auth-language">{{template "admin_language" .}}</div>
 <aside class="auth-side">
-  <span class="brand-mark">{{template "i_logo" .}}</span>
-  <h2>把每一笔订单<br>变成即时交付</h2>
-  <p>card word 是轻量、可插件化的发卡系统：自动发货、卡密加密、完整审计，单二进制部署。</p>
+  <span class="brand-mark">{{template "site_logo" .}}</span>
+  <h2><span data-admin-i18n>店铺管理后台</span></h2>
+  <p><span data-admin-i18n>管理商品、卡密库存和订单。</span></p><div class="auth-monogram" aria-hidden="true">cw<span>↗</span></div>
   <ul class="checklist">
-    <li>{{template "i_bolt" .}} 支付回调确认后秒级发卡</li>
-    <li>{{template "i_lock" .}} 卡密 AES-256-GCM 加密存储</li>
-    <li>{{template "i_shield" .}} 两步验证与三级角色权限</li>
+    <li>{{template "i_bolt" .}} <span data-admin-i18n>查看付款与发卡状态</span></li>
+    <li>{{template "i_lock" .}} <span data-admin-i18n>商品卡密加密保存</span></li>
+    <li>{{template "i_shield" .}} <span data-admin-i18n>管理团队账号与权限</span></li>
   </ul>
 </aside>
 <main class="auth-main">
   <div class="auth-card">
     <div class="auth-brand">
-      <span class="brand-mark">{{template "i_logo" .}}</span>
+      <span class="brand-mark">{{template "site_logo" .}}</span>
       <div>
         <h1>{{.Site.Name}}</h1>
-        <div class="sub">管理员控制台</div>
+        <div class="sub"><span data-admin-i18n>使用后台账号登录</span></div>
       </div>
     </div>
-    {{if .Error}}<div class="alert err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
+    {{if .Flash}}<div class="alert info" role="status">{{.Flash}}</div>{{end}}
+    {{if .Error}}<div class="alert err" role="alert">{{template "i_alert" .}}<div data-admin-i18n>{{.Error}}</div></div>{{end}}
     <form method="post" action="/admin/login" class="form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label>用户名<input type="text" name="username" autocomplete="username" required autofocus></label>
-      <label>密码<input type="password" name="password" autocomplete="current-password" required></label>
-      <label>验证码
-        <span class="captcha-row">
-          <span class="captcha-img">{{.Captcha}}</span>
-          <input type="text" name="captcha" autocomplete="off" inputmode="text" maxlength="4" placeholder="输入图中 4 位字符" required>
-        </span>
-      </label>
-      <button class="btn primary block lg" type="submit">{{template "i_lock" .}} 登录</button>
+      <label><span data-admin-i18n>用户名</span><input type="text" name="username" value="{{.Username}}" autocomplete="username" required {{if not .Username}}autofocus{{end}}></label>
+      <label><span data-admin-i18n>密码</span><input type="password" name="password" autocomplete="current-password" required {{if .Username}}autofocus{{end}}></label>
+      {{template "captcha_field" .}}
+      <button class="btn primary block lg" type="submit">{{template "i_lock" .}} <span data-admin-i18n>登录</span></button>
     </form>
-    <div class="auth-foot">{{template "i_shield" .}} 所有管理操作都会记录来源 IP 与时间。</div>
+    <a class="auth-back" href="/">{{template "i_arrow_left" .}} <span data-admin-i18n>返回店铺</span></a><div class="auth-foot">{{template "i_shield" .}} <span data-admin-i18n>操作日志记录来源 IP 与时间。</span></div>
   </div>
 </main>
 </body>
 </html>{{end}}
+{{define "captcha_field"}}<div class="captcha-field" data-captcha-ttl="{{if .Challenge}}{{.Challenge.TTL}}{{else}}{{.CaptchaTTL}}{{end}}">
+        {{if .Challenge}}<input type="hidden" name="captcha_id" value="{{.Challenge.ID}}"><input type="hidden" name="scope" value="{{.Challenge.Scope}}">{{end}}
+        <label for="captcha-answer" data-zh="安全验证：从左到右输入 6 个实心字符，跳过空心字符" data-en="Enter the 6 solid characters from left to right. Skip the outlined ones."><span data-admin-i18n>安全验证：从左到右输入 6 个实心字符，跳过空心字符</span></label>
+        <div class="captcha-preview"><button class="captcha-image-button" type="button" data-captcha-refresh disabled aria-label="点击验证码图片更换验证码" title="点击图片更换验证码" data-admin-i18n-attrs="aria-label title"><img data-captcha-image src="{{if .Challenge}}{{.Challenge.Image}}{{else}}{{.Captcha}}{{end}}" width="192" height="61" alt="图形验证码：仅输入实心字符" data-admin-i18n-attrs="alt"></button><noscript><span data-admin-i18n>请重新打开此表单更换验证码。</span></noscript></div>
+        <input id="captcha-answer" type="text" name="captcha" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" minlength="6" maxlength="6" placeholder="输入 6 位字符，不区分大小写" aria-describedby="captcha-help" required data-admin-i18n-attrs="placeholder">
+        <span class="small muted" id="captcha-help" role="status"><span data-admin-i18n>验证码 3 分钟内有效。点击图片可更换。</span></span>
+      </div>{{end}}
+{{define "order_challenge"}}{{template "head" .}}<body>{{template "shop_nav" .}}<main class="container narrow">{{template "flash" .}}<section class="panel"><div class="panel-head"><h1>{{.Title}}</h1></div><div class="panel-body"><form class="form" action="{{.FormAction}}" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}">{{if .Token}}<input type="hidden" name="token" value="{{.Token}}">{{end}}{{template "captcha_field" .}}<button class="btn primary" type="submit">{{.Title}}</button></form></div></section></main>{{template "footer" .}}</body></html>{{end}}

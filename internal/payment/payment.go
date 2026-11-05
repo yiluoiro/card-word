@@ -11,13 +11,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Request describes a payment to start.
 type Request struct {
+	Method      string
+	ExpiresAt   time.Time
 	OrderNo     string
 	Subject     string
 	AmountCents int64
@@ -40,6 +45,7 @@ type Action struct {
 
 // Callback is a verified provider notification.
 type Callback struct {
+	Method      string
 	Driver      string
 	TxnID       string
 	OrderNo     string
@@ -63,8 +69,19 @@ type Driver interface {
 	RefundURL(orderNo string) string
 }
 
+// SupportsCurrency lets drivers constrain settlement currencies without
+// changing the plugin driver interface. Unconstrained drivers retain their
+// existing behavior (for example, manually confirmed bank transfers).
+func SupportsCurrency(d Driver, currency string) bool {
+	if limited, ok := d.(interface{ SupportsCurrency(string) bool }); ok {
+		return limited.SupportsCurrency(currency)
+	}
+	return true
+}
+
 // Registry holds the available drivers.
 type Registry struct {
+	mu      sync.RWMutex
 	drivers map[string]Driver
 	order   []string
 }
@@ -80,6 +97,8 @@ func (r *Registry) Register(d Driver) {
 	if d == nil {
 		return
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if _, ok := r.drivers[d.Name()]; !ok {
 		r.order = append(r.order, d.Name())
 	}
@@ -88,6 +107,8 @@ func (r *Registry) Register(d Driver) {
 
 // Unregister removes a driver by name.
 func (r *Registry) Unregister(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	delete(r.drivers, name)
 	for i, n := range r.order {
 		if n == name {
@@ -99,12 +120,16 @@ func (r *Registry) Unregister(name string) {
 
 // Get resolves a driver by name.
 func (r *Registry) Get(name string) (Driver, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	d, ok := r.drivers[name]
 	return d, ok
 }
 
 // List returns drivers in registration order.
 func (r *Registry) List() []Driver {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	out := make([]Driver, 0, len(r.order))
 	for _, n := range r.order {
 		if d, ok := r.drivers[n]; ok {
@@ -157,7 +182,7 @@ type EpayConfig struct {
 	GatewayURL string // e.g. https://pay.example.com
 	PID        string
 	Key        string
-	PayType    string // alipay, wxpay, qqpay ...
+	PayType    string // alipay, wxpay, qqpay, usdt, paypal
 }
 
 // Epay implements the widely used 彩虹易支付 protocol.
@@ -183,15 +208,32 @@ func NewEpay(cfg EpayConfig) (*Epay, error) {
 // Name implements Driver.
 func (e *Epay) Name() string { return "epay" }
 
+// PayType is the payment method sent to the gateway at checkout.
+func (e *Epay) PayType() string { return e.cfg.PayType }
+
+// The built-in EPay protocol submits yuan amounts, with no currency parameter
+// or conversion. Never interpret a foreign-currency order as the same yuan sum.
+func (e *Epay) SupportsCurrency(currency string) bool { return currency == "CNY" }
+
 // Title implements Driver.
 func (e *Epay) Title() string { return "EPay (Alipay / WeChat / QQ)" }
 
 // Create implements Driver.
 func (e *Epay) Create(_ context.Context, req Request) (*Action, error) {
-	money := strconv.FormatFloat(float64(req.AmountCents)/100.0, 'f', 2, 64)
+	method, err := epayMethod(req.Method, e.cfg.PayType)
+	if err != nil {
+		return nil, err
+	}
+	if !e.SupportsCurrency(req.Currency) {
+		return nil, errors.New("payment: epay only supports CNY")
+	}
+	if req.AmountCents < 0 {
+		return nil, errors.New("payment: negative amount")
+	}
+	money := fmt.Sprintf("%d.%02d", req.AmountCents/100, req.AmountCents%100)
 	params := map[string]string{
 		"pid":          e.cfg.PID,
-		"type":         e.cfg.PayType,
+		"type":         method,
 		"out_trade_no": req.OrderNo,
 		"notify_url":   req.NotifyURL,
 		"return_url":   req.ReturnURL,
@@ -219,11 +261,10 @@ func (e *Epay) VerifyCallback(_ context.Context, params map[string]string, body 
 	}
 	// A callback signed with our key but carrying another merchant id means a
 	// misconfigured or swapped gateway; never settle an order in that case.
-	if pid := strings.TrimSpace(params["pid"]); pid != "" && pid != e.cfg.PID {
+	if pid := params["pid"]; pid != e.cfg.PID {
 		return nil, fmt.Errorf("payment: epay pid mismatch (got %q)", pid)
 	}
-	orderNo := firstNonEmpty(params["out_trade_no"], params["trade_no"])
-	if orderNo == "" {
+	if strings.TrimSpace(params["out_trade_no"]) == "" || strings.TrimSpace(params["trade_no"]) == "" {
 		return nil, errors.New("payment: epay callback without trade number")
 	}
 	moneyCents, err := moneyToCents(params["money"])
@@ -232,6 +273,7 @@ func (e *Epay) VerifyCallback(_ context.Context, params map[string]string, body 
 	}
 	paid := strings.EqualFold(params["trade_status"], "TRADE_SUCCESS")
 	return &Callback{
+		Method:      params["type"],
 		Driver:      e.Name(),
 		TxnID:       params["trade_no"],
 		OrderNo:     params["out_trade_no"],
@@ -281,6 +323,19 @@ func moneyToCents(s string) (int64, error) {
 		return 0, errors.New("payment: missing amount")
 	}
 	parts := strings.SplitN(s, ".", 2)
+	for _, part := range parts {
+		if part == "" {
+			return 0, fmt.Errorf("payment: invalid amount %q", s)
+		}
+		for _, c := range part {
+			if c < '0' || c > '9' {
+				return 0, fmt.Errorf("payment: invalid amount %q", s)
+			}
+		}
+	}
+	if len(parts) == 2 && len(parts[1]) > 2 {
+		return 0, fmt.Errorf("payment: invalid amount %q", s)
+	}
 	units, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("payment: invalid amount %q", s)
@@ -298,6 +353,9 @@ func moneyToCents(s string) (int64, error) {
 		}
 		cents = c
 	}
+	if units > (math.MaxInt64-cents)/100 {
+		return 0, errors.New("payment: amount overflow")
+	}
 	return units*100 + cents, nil
 }
 
@@ -308,4 +366,18 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+// Empty preserves legacy orders; cashier leaves the channel to the gateway.
+func epayMethod(method, fallback string) (string, error) {
+	if method == "" {
+		return fallback, nil
+	}
+	switch method {
+	case "alipay", "wxpay", "qqpay", "usdt", "paypal":
+		return method, nil
+	case "cashier":
+		return "", nil
+	}
+	return "", errors.New("payment: unsupported epay method")
 }

@@ -3,90 +3,87 @@
 {{template "admin_sidebar" .}}
 <div class="main">
 {{template "admin_topbar" .}}
-<main class="content">
+<main class="content dashboard-content">
   {{template "flash" .}}
-  <div class="page-head">
-    <div class="titles">
-      <h1>概览</h1>
-      <div class="sub">今日经营数据与库存健康度</div>
-    </div>
-    <div class="actions">
-      <a class="btn sm" href="/admin/orders?status=pending">{{template "i_receipt" .}} 待支付订单</a>
-      <a class="btn primary sm" href="/admin/products/0">{{template "i_plus" .}} 新建商品</a>
-    </div>
+  <div class="page-head dashboard-heading">
+    <div class="titles"><span class="overline">DASHBOARD</span><h1><span data-admin-i18n>经营概览</span></h1></div>
+    <div class="actions">{{if .CanManage}}<a class="btn" href="{{.PeriodExportURL}}">{{template "i_download" .}} <span data-admin-i18n>导出数据</span></a><a class="btn primary" href="/admin/products/0">{{template "i_rocket" .}} <span data-admin-i18n>新建商品</span></a>{{else}}<span class="badge"><span data-admin-i18n>只读访问</span></span>{{end}}</div>
   </div>
 
-  <div class="stats">
-    <div class="stat">
-      <div class="label">{{template "i_receipt" .}} 今日订单</div>
-      <div class="value">{{.Stats.TodayOrders}}</div>
-      <div class="delta">累计 {{.Stats.TotalOrders}} 单</div>
-      {{if .SparkOrders}}<div class="spark" aria-hidden="true"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="{{.SparkOrders}}"/></svg></div>{{end}}
-    </div>
-    <div class="stat">
-      <div class="label">{{template "i_bolt" .}} 今日收入</div>
-      <div class="value">{{money .Stats.TodayRevenue .Currency}}</div>
-      <div class="delta">累计 {{money .Stats.RevenueCents .Currency}}</div>
-      {{if .SparkRevenue}}<div class="spark" aria-hidden="true"><svg viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="{{.SparkRevenue}}"/></svg></div>{{end}}
-    </div>
-    <div class="stat">
-      <div class="label">{{template "i_check" .}} 已支付订单</div>
-      <div class="value">{{.Stats.PaidOrders}}</div>
-      <div class="delta">支付率 {{pct .Stats.PaidOrders .Stats.TotalOrders}}%</div>
-    </div>
-    <div class="stat">
-      <div class="label">{{template "i_refresh" .}} 待支付</div>
-      <div class="value">{{.Stats.PendingOrders}}</div>
-      <div class="delta">超时自动关闭</div>
-    </div>
-    <div class="stat">
-      <div class="label">{{template "i_puzzle" .}} 已启用插件</div>
-      <div class="value">{{.PluginCount}}</div>
-      <div class="delta"><a href="/admin/plugins">管理应用商城</a></div>
-    </div>
-  </div>
+  <section class="overview-metrics" aria-label="经营概况" data-admin-i18n-attrs="aria-label">
+    <article class="metric-card metric-violet featured"><div class="metric-label"><span class="metric-icon">{{template "i_chart" .}}</span><span><span data-admin-i18n>本月订单数</span></span></div><strong class="metric-value">{{.MonthStats.Orders}}</strong><div class="metric-note"><span data-admin-i18n>今日新增：</span>{{.Stats.TodayOrders}}</div>{{template "dashboard_spark" (dict "Points" .SparkOrders "ID" "spark-orders")}}</article>
+    <article class="metric-card metric-blue"><div class="metric-label"><span class="metric-icon">{{template "i_wallet" .}}</span><span><span data-admin-i18n>待付款订单</span></span></div><strong class="metric-value">{{.Stats.PendingOrders}}</strong><div class="metric-note"><span data-admin-i18n>等待买家完成付款</span></div>{{template "dashboard_spark" (dict "Points" .SparkPending "ID" "spark-pending")}}</article>
+    <article class="metric-card metric-green"><div class="metric-label"><span class="metric-icon">{{template "i_users" .}}</span><span><span data-admin-i18n>已支付订单</span></span></div><strong class="metric-value">{{.Stats.PaidOrders}}</strong><div class="metric-note"><span data-admin-i18n>支付率</span> {{pct .Stats.PaidOrders .Stats.TotalOrders}}%</div>{{template "dashboard_spark" (dict "Points" .SparkPaid "ID" "spark-paid")}}</article>
+    <article class="metric-card metric-orange"><div class="metric-label"><span class="metric-icon">{{template "i_wallet" .}}</span><span><span data-admin-i18n>累计收入</span></span></div><strong class="metric-value money-value">{{money .Stats.RevenueCents .Currency}}</strong><div class="metric-note"><span data-admin-i18n>已收款订单金额汇总</span></div>{{template "dashboard_spark" (dict "Points" .SparkRevenue "ID" "spark-revenue")}}</article>
+  </section>
 
-  <div class="panel">
-    <div class="panel-head"><h3>近 7 天订单</h3><span class="panel-sub">按下单时间统计，含未支付订单</span></div>
-    <div class="panel-body">
-      <div class="chart">
-        {{range .Trend}}
-        <div class="chart-col" title="{{.Label}} · {{.Orders}} 单 · {{.Revenue}}">
-          <div class="chart-bar" style="height:{{.Height}}%"><span>{{.Orders}}</span></div>
-          <div class="chart-label">{{.Label}}</div>
-        </div>
-        {{end}}
+  <section class="business-section" aria-labelledby="business-heading">
+    <div class="business-head"><div><h2 id="business-heading"><span data-admin-i18n>经营数据</span></h2><p>{{.Period.From}} — {{.Period.To}} <span data-admin-i18n>· 按 UTC 下单日期统计，收入不含已退款订单</span></p></div>
+      <form method="get" action="/admin" class="period-form">
+        <label class="period-label"><span data-admin-i18n>统计周期</span><select name="period" data-period-select><option value="month" {{if eq .Period.Key "month"}}selected{{end}} data-admin-i18n-option>本月</option><option value="last_month" {{if eq .Period.Key "last_month"}}selected{{end}} data-admin-i18n-option>上月</option><option value="7d" {{if eq .Period.Key "7d"}}selected{{end}} data-admin-i18n-option>近 7 天</option><option value="30d" {{if eq .Period.Key "30d"}}selected{{end}} data-admin-i18n-option>近 30 天</option><option value="custom" {{if eq .Period.Key "custom"}}selected{{end}} data-admin-i18n-option>自定义</option></select></label>
+        <label class="currency-control"><span class="sr-only"><span data-admin-i18n>经营数据币种</span></span><select name="currency" aria-label="经营数据币种" data-admin-i18n-attrs="aria-label">{{range .Currencies}}<option value="{{.}}" {{if eq . $.Currency}}selected{{end}} data-admin-i18n-option>{{.}}</option>{{end}}</select></label>
+        <details class="period-custom" {{if eq .Period.Key "custom"}}open{{end}}><summary>{{template "i_calendar" .}} <span data-admin-i18n>自定义</span></summary><div class="period-popover"><label><span data-admin-i18n>开始日期</span><input type="date" name="from" value="{{.Period.From}}" max="{{.TodayUTC}}"></label><label><span data-admin-i18n>结束日期</span><input type="date" name="to" value="{{.Period.To}}" max="{{.TodayUTC}}"></label><p><span data-admin-i18n>最多 366 天，结束日期不晚于今天。</span></p><button class="btn primary" name="custom" value="1" type="submit" data-custom-period><span data-admin-i18n>应用日期</span></button></div></details>
+        <button class="btn period-apply" type="submit"><span data-admin-i18n>查看</span></button>
+      </form>
+    </div>
+    <div class="business-metrics" title="上一周期为所选开始日期之前、相同天数的时间段">
+      <article class="business-card metric-violet"><div class="metric-label"><span class="metric-icon">{{template "i_receipt" .}}</span><span data-admin-i18n>订单总数</span></div><strong class="metric-value">{{.PeriodStats.Orders}}</strong><div class="metric-note"><span data-admin-i18n>{{.OrdersChange}}</span></div><span class="metric-rule" aria-hidden="true"></span></article>
+      <article class="business-card metric-violet tinted"><div class="metric-label"><span class="metric-icon">{{template "i_diamond" .}}</span><span data-admin-i18n>收入总计</span></div><strong class="metric-value money-value">{{money .PeriodStats.Revenue .Currency}}</strong><div class="metric-note"><span data-admin-i18n>{{.RevenueChange}}</span></div><span class="metric-rule" aria-hidden="true"></span></article>
+      <article class="business-card metric-green"><div class="metric-label"><span class="metric-icon">{{template "i_check" .}}</span><span data-admin-i18n>已完成订单</span></div><strong class="metric-value">{{.PeriodStats.Completed}}</strong><div class="metric-note"><span data-admin-i18n>{{.CompletedChange}}</span></div><span class="metric-rule" aria-hidden="true"></span></article>
+      <article class="business-card metric-orange"><div class="metric-label"><span class="metric-icon">{{template "i_circle_close" .}}</span><span data-admin-i18n>已关闭订单</span></div><strong class="metric-value">{{.PeriodStats.Closed}}</strong><div class="metric-note"><span data-admin-i18n>{{.ClosedChange}}</span></div><span class="metric-rule" aria-hidden="true"></span></article>
+    </div>
+  </section>
+
+  <div class="dashboard-grid">
+    <section class="panel trend-panel"><div class="panel-head"><h2><span data-admin-i18n>订单趋势</span></h2><span class="panel-sub">{{.Currency}} <span data-admin-i18n>· 近 7 天 · 全部订单</span> <span class="chart-info" title="包含未支付订单；鼠标悬停或键盘聚焦节点可查看当天明细">{{template "i_info" .}}</span></span></div>
+      <div class="line-chart" data-line-chart>
+        <svg viewBox="0 0 820 242" role="group" aria-labelledby="trend-chart-title"><title id="trend-chart-title">近七天订单数量趋势，节点可查看每日数量和收入</title>
+          <defs><linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".14"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+          {{range .Chart.Ticks}}<line class="chart-gridline" x1="40" y1="{{.Y}}" x2="788" y2="{{.Y}}"/><text class="chart-axis" x="22" y="{{.Y}}" dominant-baseline="middle" text-anchor="end">{{.Value}}</text>{{end}}
+          <polygon points="{{.Chart.Area}}" fill="url(#trend-fill)"/><polyline class="trend-line" points="{{.Chart.Line}}"/>
+          {{range .Chart.Points}}<text class="chart-axis" x="{{.X}}" y="230" text-anchor="middle">{{.Label}}</text><g class="trend-point" role="img" tabindex="0" aria-label="{{.Label}}，{{.Orders}} 单，收入 {{.Revenue}}" data-chart-tip="{{.Label}} · {{.Orders}} 单 · {{.Revenue}}"><title>{{.Label}} · {{.Orders}} 单 · {{.Revenue}}</title><circle class="point-target" cx="{{.X}}" cy="{{.Y}}" r="13"/><circle class="point-dot" cx="{{.X}}" cy="{{.Y}}" r="3.5"/></g>{{end}}
+        </svg><div class="chart-tooltip" role="status" hidden></div>
       </div>
-    </div>
+    </section>
+    <aside class="panel quick-panel"><div class="panel-head"><h2><span data-admin-i18n>工作台</span></h2><span class="badge accent"><span data-admin-i18n>快捷入口</span></span></div><div class="quick-links">
+      <a href="/admin/settings#settings-payment"><span class="quick-icon">{{template "i_calendar" .}}</span><span><b><span data-admin-i18n>查看收款配置</span></b><small><span data-admin-i18n>管理支付方式与收款说明</span></small></span>{{template "i_chevron_right" .}}</a>
+      <a href="/admin/products?status=active&stock=low"><span class="quick-icon">{{template "i_box" .}}</span><span><b><span data-admin-i18n>设置商品库存</span></b><small>{{.LowStockCount}} <span data-admin-i18n>件上架商品需要补货</span></small></span>{{template "i_chevron_right" .}}</a>
+      <a href="/admin/customers"><span class="quick-icon">{{template "i_users" .}}</span><span><b><span data-admin-i18n>买家管理中心</span></b><small><span data-admin-i18n>查看注册买家与关联订单</span></small></span>{{template "i_chevron_right" .}}</a>
+    </div></aside>
   </div>
 
+  <div class="desk-rail" aria-label="快捷工具" data-admin-i18n-attrs="aria-label"><button type="button" data-help-open title="经营帮助" aria-label="经营帮助" data-admin-i18n-attrs="title aria-label">{{template "i_headphones" .}}</button><a href="/admin/account" aria-label="账号安全" title="账号安全" data-admin-i18n-attrs="aria-label title">{{if .User}}{{printf "%.1s" .User.Username}}{{end}}</a></div>
+  <section class="workspace-tasks" aria-labelledby="workspace-tasks-title">
+    <div class="workspace-section-head"><h2 id="workspace-tasks-title"><span data-admin-i18n>待办事项</span></h2></div>
+    <div class="workspace-task-grid">{{range .Tasks}}<a class="workspace-task {{if .Count}}needs-action{{end}}" href="{{.URL}}"><span data-admin-i18n>{{.Label}}</span><strong>{{.Count}}</strong><small><span data-admin-i18n>{{.Hint}}</span></small><span class="task-link"><span data-admin-i18n>查看列表 →</span></span></a>{{end}}</div>
+  </section>
   {{if .LowStock}}
   <div class="alert warn">
     {{template "i_alert" .}}
-    <div>库存不足：{{range $i, $p := .LowStock}}{{if $i}}、{{end}}<a href="/admin/products/{{$p.ID}}/cards">{{$p.Name}}（{{$p.Stock}}）</a>{{end}}</div>
+    <div><span data-admin-i18n>库存不足（共 </span>{{.LowStockCount}} <span data-admin-i18n>件，最多展示 8 件）：</span>{{range $i, $p := .LowStock}}{{if $i}}、{{end}}<a href="/admin/products/{{$p.ID}}/cards">{{$p.Name}}（{{$p.Stock}}）</a>{{end}} · <a href="/admin/products?status=active&stock=low"><span data-admin-i18n>查看全部</span></a></div>
   </div>
   {{end}}
 
   <div class="panel">
     <div class="panel-head">
-      <h3>最近订单</h3>
-      <div class="actions"><a class="btn ghost sm" href="/admin/orders">全部订单 {{template "i_arrow_right" .}}</a></div>
+      <h3><span data-admin-i18n>最近订单</span></h3>
+      <div class="actions"><a class="btn ghost sm" href="/admin/orders"><span data-admin-i18n>全部订单</span> {{template "i_arrow_right" .}}</a></div>
     </div>
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table stack">
-          <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>状态</th><th>下单时间</th></tr></thead>
+          <thead><tr><th><span data-admin-i18n>订单号</span></th><th><span data-admin-i18n>商品</span></th><th class="num"><span data-admin-i18n>金额</span></th><th><span data-admin-i18n>状态</span></th><th><span data-admin-i18n>下单时间</span></th></tr></thead>
           <tbody>
           {{range .Orders}}
             <tr>
-              <td data-label="订单号"><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
-              <td data-label="商品"><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
-              <td class="num" data-label="金额">{{money .TotalCents .Currency}}</td>
-              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="secondary-cell" data-label="下单时间">{{datetime .CreatedAt}}</td>
+              <td data-label="订单号" data-admin-i18n-attrs="data-label"><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
+              <td data-label="商品" data-admin-i18n-attrs="data-label"><span class="primary-cell">{{.ProductName}}{{if .VariantName}} · {{.VariantName}}{{end}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
+              <td class="num" data-label="金额" data-admin-i18n-attrs="data-label">{{money .TotalCents .Currency}}</td>
+              <td data-label="状态" data-admin-i18n-attrs="data-label"><span class="badge {{statusClass .Status}}"><span data-admin-i18n>{{statusText .Status}}</span></span></td>
+              <td class="secondary-cell" data-label="下单时间" data-admin-i18n-attrs="data-label">{{datetime .CreatedAt}}</td>
             </tr>
           {{else}}
-            <tr><td colspan="5" class="muted">还没有订单，前台下单后会出现在这里。</td></tr>
+            <tr><td colspan="5" class="muted"><span data-admin-i18n>还没有订单，前台下单后会出现在这里。</span></td></tr>
           {{end}}
           </tbody>
         </table>
@@ -97,7 +94,6 @@
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_products"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -107,67 +103,73 @@
   {{template "flash" .}}
   <div class="page-head">
     <div class="titles">
-      <h1>商品</h1>
-      <div class="sub">共 {{len .Products}} 个商品 · 库存实时统计</div>
+      <h1><span data-admin-i18n>商品</span></h1>
+      <div class="sub"><span data-admin-i18n>共</span> {{.Pagination.Total}} <span data-admin-i18n>个匹配商品 · 库存实时统计</span></div>
     </div>
-    <div class="actions"><a class="btn primary sm" href="/admin/products/0">{{template "i_plus" .}} 新建商品</a></div>
+    <div class="actions">{{if .CanManage}}<a class="btn primary sm" href="/admin/products/0">{{template "i_plus" .}} <span data-admin-i18n>新建商品</span></a>{{end}}</div>
   </div>
 
-  <form class="search" method="get" action="/admin/products" role="search" style="max-width:540px;margin-bottom:16px">
-    <span class="search-icon">{{template "i_search" .}}</span>
-    <input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或别名" aria-label="搜索商品">
-    <button class="btn primary" type="submit">搜索</button>
-  </form>
+  <form class="toolbar admin-list-filter" method="get" action="/admin/products" role="search"><div class="filter-primary">
+    <label class="filter-search"><span data-admin-i18n>搜索</span><input type="search" name="q" value="{{.Search}}" placeholder="搜索商品名称或别名" aria-label="搜索商品" data-admin-i18n-attrs="placeholder aria-label"></label>
+    <label><span data-admin-i18n>分类</span><select name="category_id" aria-label="筛选商品分类" data-admin-i18n-attrs="aria-label"><option value="0" data-admin-i18n-option>全部分类</option>{{range .Categories}}<option value="{{.ID}}" {{if eq $.CategoryID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+    <label><span data-admin-i18n>状态</span><select name="status" aria-label="筛选商品状态" data-admin-i18n-attrs="aria-label"><option value="" data-admin-i18n-option>全部状态</option><option value="active" {{if eq .Status "active"}}selected{{end}} data-admin-i18n-option>上架</option><option value="draft" {{if eq .Status "draft"}}selected{{end}} data-admin-i18n-option>草稿</option><option value="archived" {{if eq .Status "archived"}}selected{{end}} data-admin-i18n-option>归档</option></select></label>
+    <label><span data-admin-i18n>库存</span><select name="stock" aria-label="筛选可售库存" data-admin-i18n-attrs="aria-label"><option value="" data-admin-i18n-option>全部库存</option><option value="low" {{if eq .Stock "low"}}selected{{end}} data-admin-i18n-option>库存不足（≤ 3）</option><option value="empty" {{if eq .Stock "empty"}}selected{{end}} data-admin-i18n-option>缺货（0）</option><option value="ready" {{if eq .Stock "ready"}}selected{{end}} data-admin-i18n-option>库存充足（&gt; 3）</option></select></label>
+    <label class="filter-size"><span data-admin-i18n>每页</span><select name="size" aria-label="每页商品数量" data-admin-i18n-attrs="aria-label"><option value="20" {{if eq .Size 20}}selected{{end}} data-admin-i18n-option>20 条 / 页</option><option value="50" {{if eq .Size 50}}selected{{end}} data-admin-i18n-option>50 条 / 页</option><option value="100" {{if eq .Size 100}}selected{{end}} data-admin-i18n-option>100 条 / 页</option></select></label>
+    <div class="filter-actions"><button class="btn primary" type="submit"><span data-admin-i18n>筛选</span></button>
+    {{if or .Search .Status .CategoryID .Stock}}<a class="btn ghost" href="/admin/products"><span data-admin-i18n>清除筛选</span></a>{{end}}
+  </div></div></form>
 
-  <form id="bulkProducts" method="post" action="/admin/products/bulk" class="toolbar">
-    <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <select name="status">
-      <option value="active">上架</option>
-      <option value="draft">草稿</option>
-      <option value="archived">归档</option>
+  {{if .CanManage}}<form id="bulkProducts" method="post" action="/admin/products/bulk" class="toolbar">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+    <select name="status" aria-label="批量设置商品状态" data-admin-i18n-attrs="aria-label">
+      <option value="active" data-admin-i18n-option>上架</option>
+      <option value="draft" data-admin-i18n-option>草稿</option>
+      <option value="archived" data-admin-i18n-option>归档</option>
     </select>
-    <button class="btn sm" type="submit" data-confirm="对勾选的商品应用该状态？">应用到选中</button>
+    <button class="btn sm" type="submit" data-confirm="对勾选的商品应用该状态？"><span data-admin-i18n>应用到选中</span></button>
+    <span class="small muted"><span data-admin-i18n>仅操作本页勾选项</span></span>
   </form>
+  {{end}}{{template "list_pager" .Pagination}}
 
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table stack">
-          <thead><tr><th style="width:34px"><input type="checkbox" data-check-all="bulkProducts" aria-label="全选商品"></th><th>商品</th><th>分类</th><th class="num">价格</th><th class="num">库存</th><th>状态</th><th class="num">操作</th></tr></thead>
+          <thead><tr><th style="width:34px">{{if .CanManage}}<input type="checkbox" data-check-all="bulkProducts" aria-label="全选本页商品">{{end}}</th><th><span data-admin-i18n>商品</span></th><th><span data-admin-i18n>分类</span></th><th class="num"><span data-admin-i18n>价格</span></th><th class="num"><span data-admin-i18n>库存</span></th><th><span data-admin-i18n>状态</span></th><th class="num"><span data-admin-i18n>操作</span></th></tr></thead>
           <tbody>
           {{range .Products}}
-            <tr>
-              <td data-label="选择"><input type="checkbox" name="ids" value="{{.ID}}" form="bulkProducts" aria-label="选择 {{.Name}}"></td>
-              <td data-label="商品">
+            <tr data-product-id="{{.ID}}">
+              <td data-label="选择">{{if $.CanManage}}<input type="checkbox" name="ids" value="{{.ID}}" form="bulkProducts" aria-label="选择 {{.Name}}">{{end}}</td>
+              <td data-label="商品" data-admin-i18n-attrs="data-label">
                 <div class="primary-cell">{{.Name}}</div>
                 <div class="secondary-cell mono">/p/{{.Slug}}</div>
               </td>
-              <td class="secondary-cell" data-label="分类">{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
-              <td class="num" data-label="价格">{{money .PriceCents .Currency}}</td>
-              <td class="num" data-label="库存">{{if gt .Stock 0}}<span class="badge ok">{{.Stock}}</span>{{else}}<span class="badge muted">0</span>{{end}}</td>
-              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="actions" data-label="操作">
-                <a class="btn sm" href="/admin/products/{{.ID}}">编辑</a>
-                <a class="btn sm" href="/admin/products/{{.ID}}/cards">{{template "i_key" .}} 卡密</a>
-                <form method="post" action="/admin/products/{{.ID}}/delete" class="inline" data-confirm="删除商品会同时删除其全部卡密，确认继续？">
-                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
-                  <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
-                </form>
+              <td class="secondary-cell" data-label="分类" data-admin-i18n-attrs="data-label">{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
+              <td class="num" data-label="价格" data-admin-i18n-attrs="data-label">{{money .PriceCents .Currency}}{{if .HasVariants}}<span data-admin-i18n>起</span>{{end}}</td>
+              <td class="num" data-label="库存" data-admin-i18n-attrs="data-label"><a href="/admin/products/{{.ID}}/cards" title="查看可售卡密"><span class="badge {{if le .Stock 3}}warn{{else}}ok{{end}}">{{.Stock}}{{if eq .Stock 0}} · 缺货{{else}}{{if le .Stock 3}} · 待补货{{end}}{{end}}</span></a></td>
+              <td data-label="状态" data-admin-i18n-attrs="data-label"><span class="badge {{statusClass .Status}}"><span data-admin-i18n>{{statusText .Status}}</span></span></td>
+              <td class="actions" data-label="操作" data-admin-i18n-attrs="data-label">
+                <a class="btn sm" href="/admin/products/{{.ID}}?return_to={{$.ListReturn}}">{{if $.CanManage}}<span data-admin-i18n>编辑</span>{{else}}<span data-admin-i18n>查看</span>{{end}}</a>
+                <a class="btn sm" href="/admin/products/{{.ID}}/cards">{{template "i_key" .}} <span data-admin-i18n>卡密</span></a>
+                {{if $.CanManage}}<form method="post" action="/admin/products/{{.ID}}/delete" class="inline" data-confirm="删除商品会同时删除其全部卡密，确认继续？">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
+                  <button class="btn sm danger" type="submit" aria-label="删除" data-admin-i18n-attrs="aria-label">{{template "i_trash" .}}</button>
+                </form>{{end}}
               </td>
             </tr>
           {{else}}
-            <tr><td colspan="7" class="muted">还没有商品，点击右上角「新建商品」开始。</td></tr>
+            <tr><td colspan="7" class="muted">{{if or .Search .Status .CategoryID .Stock}}<span data-admin-i18n>没有符合条件的商品，请调整筛选条件。</span>{{else}}<span data-admin-i18n>还没有商品，点击右上角「新建商品」开始。</span>{{end}}</td></tr>
           {{end}}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  {{template "list_pager" .Pagination}}
 </main>
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_product_form"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -175,72 +177,97 @@
 {{template "admin_topbar" .}}
 <main class="content narrow">
   {{template "flash" .}}
-  <a class="back" href="/admin/products">{{template "i_arrow_left" .}} 返回商品列表</a>
+  <a class="back" href="{{if .ListReturn}}{{.ListReturn}}{{else}}/admin/products{{end}}">{{template "i_arrow_left" .}} <span data-admin-i18n>返回商品列表</span></a>
   <div class="page-head">
     <div class="titles">
-      <h1>{{if .Product}}编辑商品{{else}}新建商品{{end}}</h1>
-      <div class="sub">{{if .Product}}别名 /p/{{.Product.Slug}}{{else}}保存后即可导入卡密{{end}}</div>
+      <h1>{{if and .Product .Product.ID}}
+ {{if .CanManage}}<span data-admin-i18n>编辑商品</span>{{else}}<span data-admin-i18n>商品详情</span>{{end}}{{else}}<span data-admin-i18n>新建商品</span>{{end}}</h1>
+      <div class="sub">{{if and .Product .Product.ID}}<span data-admin-i18n>别名 /p/</span>{{.Product.Slug}}{{else}}<span data-admin-i18n>保存后即可导入卡密</span>{{end}}</div>
     </div>
   </div>
 
   <div class="panel">
     <div class="panel-body">
-      <form method="post" action="/admin/products" class="form">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <form method="post" action="/admin/products" class="form" data-unsaved-warning="{{if .Submitted}}true{{end}}">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
         {{if .Product}}<input type="hidden" name="id" value="{{.Product.ID}}">{{end}}
 
-        <label>商品名称<input type="text" name="name" value="{{if .Product}}{{.Product.Name}}{{end}}" required autofocus></label>
+        <fieldset class="readonly-fields" {{if not .CanManage}}disabled{{end}}>
+        <label><span data-admin-i18n>商品名称</span><input type="text" name="name" value="{{if .Product}}{{.Product.Name}}{{end}}" required autofocus></label>
         <div class="row">
-          <label>访问别名<span class="hint">留空自动生成</span><input type="text" name="slug" value="{{if .Product}}{{.Product.Slug}}{{end}}" placeholder="demo-card"></label>
-          <label>分类
+          <label><span data-admin-i18n>访问别名</span><span class="hint"><span data-admin-i18n>留空自动生成</span></span><input type="text" name="slug" value="{{if .Product}}{{.Product.Slug}}{{end}}" placeholder="demo-card"></label>
+          <label><span data-admin-i18n>分类</span>
             <select name="category_id">
-              <option value="0">未分类</option>
+              <option value="0" data-admin-i18n-option>未分类</option>
               {{range .Categories}}<option value="{{.ID}}" {{if and $.Product (eq $.Product.CategoryID.Int64 .ID)}}selected{{end}}>{{.Name}}</option>{{end}}
             </select>
           </label>
         </div>
         <div class="row">
-          <label>价格（元）<input type="text" name="price" value="{{if .Product}}{{moneyShort .Product.PriceCents}}{{end}}" placeholder="9.90" required></label>
-          <label>货币<input type="text" name="currency" value="{{if .Product}}{{.Product.Currency}}{{else}}CNY{{end}}"></label>
-          <label>状态
+          <label><span data-admin-i18n>价格（元）</span><input type="text" name="price" inputmode="decimal" value="{{if .Submitted}}{{.Form.Get "price"}}{{else}}{{if .Product}}{{moneyShort .Product.PriceCents}}{{end}}{{end}}" placeholder="9.90" required></label>
+          <label><span data-admin-i18n>货币</span><input type="text" name="currency" value="{{if .Product}}{{.Product.Currency}}{{else}}CNY{{end}}"></label>
+          <label><span data-admin-i18n>状态</span>
             <select name="status">
-              <option value="active" {{if and .Product (eq .Product.Status "active")}}selected{{end}}>上架</option>
-              <option value="draft" {{if and .Product (eq .Product.Status "draft")}}selected{{end}}>草稿</option>
-              <option value="archived" {{if and .Product (eq .Product.Status "archived")}}selected{{end}}>归档</option>
+              <option value="active" {{if and .Product (eq .Product.Status "active")}}selected{{end}} data-admin-i18n-option>上架</option>
+              <option value="draft" {{if and .Product (eq .Product.Status "draft")}}selected{{end}} data-admin-i18n-option>草稿</option>
+              <option value="archived" {{if and .Product (eq .Product.Status "archived")}}selected{{end}} data-admin-i18n-option>归档</option>
             </select>
           </label>
         </div>
         <div class="row">
-          <label>最少购买<input type="number" name="min_qty" value="{{if .Product}}{{.Product.MinQty}}{{else}}1{{end}}" min="1"></label>
-          <label>最多购买<input type="number" name="max_qty" value="{{if .Product}}{{.Product.MaxQty}}{{else}}10{{end}}" min="1"></label>
-          <label>排序权重<input type="number" name="sort" value="{{if .Product}}{{.Product.Sort}}{{else}}0{{end}}"></label>
+          <label><span data-admin-i18n>最少购买</span><input type="number" name="min_qty" value="{{if .Submitted}}{{.Form.Get "min_qty"}}{{else}}{{if .Product}}{{.Product.MinQty}}{{else}}1{{end}}{{end}}" min="1"></label>
+          <label><span data-admin-i18n>最多购买</span><input type="number" name="max_qty" value="{{if .Submitted}}{{.Form.Get "max_qty"}}{{else}}{{if .Product}}{{.Product.MaxQty}}{{else}}10{{end}}{{end}}" min="1"></label>
+          <label><span data-admin-i18n>排序权重</span><input type="number" name="sort" value="{{if .Submitted}}{{.Form.Get "sort"}}{{else}}{{if .Product}}{{.Product.Sort}}{{else}}0{{end}}{{end}}"></label>
         </div>
-        <label>一句话简介<input type="text" name="summary" value="{{if .Product}}{{.Product.Summary}}{{end}}" placeholder="展示在商品卡片上"></label>
-        <label>详细说明<textarea name="description" rows="7">{{if .Product}}{{.Product.Description}}{{end}}</textarea></label>
+        <section class="markdown-editor" data-markdown-editor>
+          <div class="markdown-toolbar"><label for="product-summary"><span data-admin-i18n>商品简介</span> <span class="badge info">Markdown</span></label><button class="btn sm" type="button" data-markdown-preview aria-controls="summary-preview" aria-expanded="false"><span data-admin-i18n>预览简介</span></button></div>
+          <textarea id="product-summary" name="summary" rows="3" aria-describedby="summary-help" placeholder="例如：**年度会员**，有效期 12 个月。">{{if .Submitted}}{{.Form.Get "summary"}}{{else}}{{if .Product}}{{.Product.Summary}}{{end}}{{end}}</textarea>
+          <p class="hint" id="summary-help"><span data-admin-i18n>商品详情显示完整格式，首页卡片自动提取纯文本摘要。</span></p>
+          <div id="summary-preview" class="markdown-body markdown-preview" data-markdown-output role="region" aria-label="简介预览" hidden></div>
+          <p class="hint" data-markdown-status role="status" aria-live="polite"></p>
+        </section>
+        <section class="markdown-editor" data-markdown-editor>
+          <div class="markdown-toolbar"><label for="product-description"><span data-admin-i18n>详细说明</span> <span class="badge info">Markdown</span></label><button class="btn sm" type="button" data-markdown-preview aria-controls="description-preview" aria-expanded="false"><span data-admin-i18n>预览说明</span></button></div>
+          <textarea id="product-description" name="description" rows="10" placeholder="## 商品介绍&#10;&#10;- 功能与权益&#10;- 使用方法&#10;&#10;> 购买前请阅读使用说明">{{if .Submitted}}{{.Form.Get "description"}}{{else}}{{if .Product}}{{.Product.Description}}{{end}}{{end}}</textarea>
+          <div id="description-preview" class="markdown-body markdown-preview" data-markdown-output role="region" aria-label="说明预览" hidden></div>
+          <p class="hint" data-markdown-status role="status" aria-live="polite"></p>
+        </section>
+        <details class="markdown-help"><summary><span data-admin-i18n>Markdown 语法参考</span></summary><p class="hint"><span data-admin-i18n>支持标题、粗体、斜体、删除线、列表、引用、链接、代码块和表格。每段最多 100 KB；不支持内嵌 HTML。图片仅支持本站 /media/ 路径。</span></p><pre>## 二级标题
+**重点内容** · *补充说明* · ~~旧内容~~
+- 使用方法
+- 交付说明
+&gt; 购买须知
+[链接文字](https://example.com)
+`代码或命令`
 
-        <div class="actions">
-          <button class="btn primary" type="submit">保存商品</button>
-          <a class="btn ghost" href="/admin/products">取消</a>
+| 功能 | 说明 |
+| --- | --- |
+| 交付 | 自动发货 |</pre></details>
+
+        </fieldset><div class="actions">
+          {{if .CanManage}}<button class="btn primary" type="submit"><span data-admin-i18n>保存商品</span></button>{{end}}
+          <a class="btn ghost" href="{{.ListReturn}}"><span data-admin-i18n>返回列表</span></a>
         </div>
       </form>
     </div>
   </div>
 
-  {{if .Product}}
+  {{if and .Product .Product.ID}}{{template "product_variants_admin" .}}{{end}}
+  {{if and .Product .Product.ID}}
   <div class="panel">
     <div class="panel-head">
-      <h3>商品封面</h3>
-      <span class="panel-sub">PNG / JPEG / WebP，最大 2MB，按魔数校验类型</span>
+      <h3><span data-admin-i18n>商品封面</span></h3>
+      <span class="panel-sub"><span data-admin-i18n>PNG / JPEG / WebP，最大 2MB，按魔数校验类型</span></span>
     </div>
     <div class="panel-body">
       {{if .Product.CoverPath}}
       <img class="product-cover" src="/media/{{.Product.CoverPath}}" alt="{{.Product.Name}} 封面" style="max-width:320px">
       {{end}}
-      <form method="post" action="/admin/products/{{.Product.ID}}/cover" enctype="multipart/form-data" class="form" style="margin-top:14px">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <input type="file" name="cover" accept="image/png,image/jpeg,image/webp" required>
-        <div class="actions"><button class="btn" type="submit">上传封面</button></div>
-      </form>
+      {{if .CanManage}}<form method="post" action="/admin/products/{{.Product.ID}}/cover" enctype="multipart/form-data" class="form" style="margin-top:14px">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+        <label><span data-admin-i18n>选择商品封面</span><input type="file" name="cover" accept="image/png,image/jpeg,image/webp" required></label>
+        <div class="actions"><button class="btn" type="submit"><span data-admin-i18n>上传封面</span></button></div>
+      </form>{{end}}
     </div>
   </div>
   {{end}}
@@ -248,7 +275,6 @@
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_cards"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -256,88 +282,86 @@
 {{template "admin_topbar" .}}
 <main class="content">
   {{template "flash" .}}
-  <a class="back" href="/admin/products">{{template "i_arrow_left" .}} 返回商品列表</a>
+  <a class="back" href="/admin/products">{{template "i_arrow_left" .}} <span data-admin-i18n>返回商品列表</span></a>
   <div class="page-head">
     <div class="titles">
-      <h1>{{.Product.Name}} · 卡密</h1>
-      <div class="sub">卡密以 AES-256-GCM 加密存储，仅在发货或手动查看时解密</div>
+      <h1>{{.Product.Name}} <span data-admin-i18n>· 卡密</span></h1>
+      <div class="sub"><span data-admin-i18n>卡密以 AES-256-GCM 加密存储，仅在发货或手动查看时解密</span></div>
     </div>
-    <div class="actions"><span class="badge ok"><span class="dot"></span>可售 {{.Stock}}</span></div>
+    <div class="actions"><span class="badge ok"><span class="dot"></span><span data-admin-i18n>可售</span> {{.Stock}}</span></div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>批量导入</h3><span class="panel-sub">每行一条，自动去重</span></div>
+  {{if .CanManage}}<details class="panel admin-create" {{if .Error}}open{{end}}>
+    <summary class="panel-head"><h3><span data-admin-i18n>批量导入</span></h3><span class="panel-sub"><span data-admin-i18n>每行一条，自动去重</span></span><span class="create-toggle">{{template "i_plus" .}} <span class="create-expand"><span data-admin-i18n>展开填写</span></span><span class="create-collapse"><span data-admin-i18n>收起表单</span></span></span></summary>
     <div class="panel-body">
       <form method="post" action="/admin/products/{{.Product.ID}}/cards" class="form">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>卡密列表
+        <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+        {{if .Variants}}<label>所属规格<select name="variant_id" required><option value="">请选择规格</option>{{range .Variants}}<option value="{{.ID}}">{{.Name}}{{if not .Active}}（已停用）{{end}}</option>{{end}}</select></label>{{end}}
+        <label><span data-admin-i18n>卡密列表</span>
           <textarea name="secrets" rows="6" placeholder="CARD-0001&#10;CARD-0002"></textarea>
         </label>
         <div class="row">
-          <label>批次标签<span class="hint">可选，便于追溯来源</span><input type="text" name="label" placeholder="2026-11 批次"></label>
+          <label><span data-admin-i18n>批次标签</span><span class="hint"><span data-admin-i18n>可选，便于追溯来源</span></span><input type="text" name="label" placeholder="2026-11 批次"></label>
           <div style="display:flex;align-items:flex-end">
-            <button class="btn primary" type="submit">{{template "i_upload" .}} 导入卡密</button>
+            <button class="btn primary" type="submit">{{template "i_upload" .}} <span data-admin-i18n>导入卡密</span></button>
           </div>
         </div>
       </form>
     </div>
-  </div>
+  </details>
 
-  <div class="chips">
-    <a class="chip {{if eq .Status ""}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards">全部</a>
-    <a class="chip {{if eq .Status "available"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=available">可售</a>
-    <a class="chip {{if eq .Status "sold"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=sold">已售</a>
-    <a class="chip {{if eq .Status "disabled"}}active{{end}}" href="/admin/products/{{.Product.ID}}/cards?status=disabled">已停用</a>
-  </div>
+  {{end}}{{template "admin_filter" .List}}
 
-  <form id="bulkCards" method="post" action="/admin/products/{{.Product.ID}}/cards/bulk" class="toolbar">
-    <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <select name="action">
-      <option value="disable">停用</option>
-      <option value="enable">恢复可售</option>
-      <option value="delete">删除（仅未售出）</option>
+  {{if .CanManage}}<form id="bulkCards" method="post" action="/admin/products/{{.Product.ID}}/cards/bulk" class="toolbar">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+    <select name="action" aria-label="批量卡密操作" data-admin-i18n-attrs="aria-label">
+      <option value="disable" data-admin-i18n-option>停用</option>
+      <option value="enable" data-admin-i18n-option>恢复可售</option>
+      <option value="delete" data-admin-i18n-option>删除（仅未售出）</option>
     </select>
-    <button class="btn sm" type="submit" data-confirm="对勾选的卡密执行该操作？">应用到选中</button>
-    <a class="btn sm ghost" href="/admin/products/{{.Product.ID}}/cards/export.csv?status={{.Status}}">{{template "i_download" .}} 导出 CSV</a>
+    <button class="btn sm" type="submit" data-confirm="对勾选的卡密执行该操作？"><span data-admin-i18n>应用到选中</span></button>
+    <span class="small muted"><span data-admin-i18n>仅操作本页勾选项</span></span>
+    <a class="btn sm ghost" href="{{.List.ExportURL}}">{{template "i_download" .}} <span data-admin-i18n>导出匹配记录（最多 5000 条）</span></a>
   </form>
+  {{end}}
 
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table stack">
-          <thead><tr><th style="width:34px"><input type="checkbox" data-check-all="bulkCards" aria-label="全选卡密"></th><th>ID</th><th>卡密</th><th>标签</th><th>状态</th><th>售出时间</th><th class="num">操作</th></tr></thead>
+          <thead><tr><th style="width:34px">{{if .CanManage}}<input type="checkbox" data-check-all="bulkCards" aria-label="全选可操作卡密">{{end}}</th><th>ID</th><th><span data-admin-i18n>卡密</span></th><th><span data-admin-i18n>标签</span></th><th><span data-admin-i18n>状态</span></th><th><span data-admin-i18n>售出时间</span></th><th class="num"><span data-admin-i18n>操作</span></th></tr></thead>
           <tbody>
           {{range .Cards}}
-            <tr>
-              <td data-label="选择"><input type="checkbox" name="ids" value="{{.ID}}" form="bulkCards" aria-label="选择卡密 {{.ID}}"></td>
+            <tr data-card-id="{{.ID}}">
+              <td data-label="选择">{{if and $.CanManage (ne .Status "sold") (not .OrderID.Valid)}}<input type="checkbox" name="ids" value="{{.ID}}" form="bulkCards" aria-label="选择卡密 {{.ID}}">{{end}}</td>
               <td class="mono secondary-cell" data-label="ID">{{.ID}}</td>
-              <td class="mono" data-label="卡密">{{.Masked}}</td>
-              <td class="secondary-cell" data-label="标签">{{if .Label}}{{.Label}}{{else}}—{{end}}</td>
-              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="secondary-cell" data-label="售出时间">{{if .SoldAt}}{{datetime .SoldAt}}{{else}}—{{end}}</td>
-              <td class="actions" data-label="操作">
-                <button class="btn sm" type="button" data-reveal="{{.ID}}">{{template "i_eye" .}} 查看</button>
-                {{if eq .Status "available"}}
+              <td class="mono" data-label="卡密" data-admin-i18n-attrs="data-label">{{.Masked}}{{if .VariantName}}<div class="secondary-cell">{{.VariantName}}</div>{{end}}</td>
+              <td class="secondary-cell" data-label="标签" data-admin-i18n-attrs="data-label">{{if .Label}}{{.Label}}{{else}}—{{end}}</td>
+              <td data-label="状态" data-admin-i18n-attrs="data-label"><span class="badge {{statusClass .Status}}"><span data-admin-i18n>{{statusText .Status}}</span></span></td>
+              <td class="secondary-cell" data-label="售出时间" data-admin-i18n-attrs="data-label">{{if .SoldAt}}{{datetime .SoldAt}}{{else}}—{{end}}</td>
+              <td class="actions" data-label="操作" data-admin-i18n-attrs="data-label">
+                {{if and (ne $.User.Role "viewer") (ne .Status "sold") (not .OrderID.Valid)}}<a class="btn sm" href="/admin/lists/cards/{{.ID}}?product_id={{$.Product.ID}}&return_to={{$.ListReturn}}"><span data-admin-i18n>编辑</span></a>{{end}}{{if $.CanManage}}<button class="btn sm" type="button" data-reveal="{{.ID}}">{{template "i_eye" .}} <span data-admin-i18n>查看</span></button>{{end}}
+                {{if and $.CanManage (eq .Status "available")}}
                 <form method="post" action="/admin/cards/{{.ID}}/disable" class="inline" data-confirm="停用后该卡密不再参与发货，确认？">
-                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
-                  <button class="btn sm danger" type="submit">停用</button>
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
+                  <button class="btn sm danger" type="submit"><span data-admin-i18n>停用</span></button>
                 </form>
                 {{end}}
               </td>
             </tr>
           {{else}}
-            <tr><td colspan="7" class="muted">暂无卡密，先在上方导入。</td></tr>
+            <tr><td colspan="7" class="muted">{{if .Status}}<span data-admin-i18n>没有符合该状态的卡密，请切换筛选。</span>{{else}}<span data-admin-i18n>暂无卡密，先在上方导入。</span>{{end}}</td></tr>
           {{end}}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  {{template "list_pager" .Pagination}}
 </main>
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_orders"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -347,54 +371,43 @@
   {{template "flash" .}}
   <div class="page-head">
     <div class="titles">
-      <h1>订单</h1>
-      <div class="sub">支付回调与人工确认都走同一条发货通道</div>
+      <h1><span data-admin-i18n>订单</span></h1>
+      <div class="sub"><span data-admin-i18n>按状态查找订单，查看付款、交付及售后记录</span></div>
     </div>
+    {{if .CanManage}}<div class="actions"><a class="btn sm" href="{{.List.ExportURL}}" title="导出当前筛选结果，最多 5000 条" data-admin-i18n-attrs="title">{{template "i_download" .}} <span data-admin-i18n>导出订单</span></a></div>{{end}}
   </div>
 
-  <form class="toolbar" method="get" action="/admin/orders">
-    <input type="search" name="q" value="{{.Search}}" placeholder="订单号 / 邮箱 / 商品">
-    <select name="status">
-      <option value="" {{if eq .Status ""}}selected{{end}}>全部状态</option>
-      <option value="pending" {{if eq .Status "pending"}}selected{{end}}>待支付</option>
-      <option value="paid" {{if eq .Status "paid"}}selected{{end}}>已支付待补发</option>
-      <option value="delivered" {{if eq .Status "delivered"}}selected{{end}}>已发货</option>
-      <option value="closed" {{if eq .Status "closed"}}selected{{end}}>已关闭</option>
-      <option value="refunded" {{if eq .Status "refunded"}}selected{{end}}>已退款</option>
-    </select>
-    <button class="btn primary" type="submit">{{template "i_search" .}} 筛选</button>
-    <a class="btn" href="/admin/orders/export.csv?status={{.Status}}&q={{.Search}}">{{template "i_download" .}} 导出 CSV</a>
-  </form>
-  {{template "pager" .}}
+  {{if .Buyer}}<div class="alert" role="status">{{template "i_users" .}}<div><span data-admin-i18n>正在查看买家</span> <strong>{{.Buyer.Username}}</strong><span data-admin-i18n>（编号</span> {{.Buyer.ID}}<span data-admin-i18n>）的订单 ·</span> <a href="/admin/customers"><span data-admin-i18n>返回买家列表</span></a> · <a href="/admin/orders"><span data-admin-i18n>查看全部订单</span></a></div></div>{{end}}
+  {{template "admin_filter" .List}}
 
   <div class="panel">
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table sticky-first stack">
-          <thead><tr><th>订单号</th><th>商品</th><th class="num">金额</th><th>买家</th><th>状态</th><th>时间</th></tr></thead>
+          <thead><tr><th><span data-admin-i18n>订单号</span></th><th><span data-admin-i18n>商品</span></th><th class="num"><span data-admin-i18n>金额</span></th><th><span data-admin-i18n>买家</span></th><th><span data-admin-i18n>状态</span></th><th><span data-admin-i18n>时间</span></th></tr></thead>
           <tbody>
           {{range .Orders}}
             <tr>
-              <td data-label="订单号"><a class="mono small" href="/admin/orders/{{.OrderNo}}">{{.OrderNo}}</a></td>
-              <td data-label="商品"><span class="primary-cell">{{.ProductName}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
-              <td class="num" data-label="金额">{{money .TotalCents .Currency}}</td>
-              <td class="secondary-cell" data-label="买家">{{if .Email}}{{maskEmail .Email}}{{else}}—{{end}}</td>
-              <td data-label="状态"><span class="badge {{statusClass .Status}}">{{statusText .Status}}</span></td>
-              <td class="secondary-cell" data-label="时间">{{datetime .CreatedAt}}</td>
+              <td data-label="订单号" data-admin-i18n-attrs="data-label"><a class="mono small" href="/admin/orders/{{.OrderNo}}?return_to={{$.ListReturn}}">{{.OrderNo}}</a></td>
+              <td data-label="商品" data-admin-i18n-attrs="data-label"><span class="primary-cell">{{.ProductName}}{{if .VariantName}} · {{.VariantName}}{{end}}</span> <span class="secondary-cell">× {{.Quantity}}</span></td>
+              <td class="num" data-label="金额" data-admin-i18n-attrs="data-label">{{money .TotalCents .Currency}}</td>
+              <td class="secondary-cell" data-label="买家" data-admin-i18n-attrs="data-label">{{if .Email}}{{maskEmail .Email}}{{else}}—{{end}}</td>
+              <td data-label="状态" data-admin-i18n-attrs="data-label"><span class="badge {{statusClass .Status}}"><span data-admin-i18n>{{statusText .Status}}</span></span></td>
+              <td class="secondary-cell" data-label="时间" data-admin-i18n-attrs="data-label">{{datetime .CreatedAt}}</td>
             </tr>
           {{else}}
-            <tr><td colspan="6" class="muted">没有符合条件的订单。</td></tr>
+            <tr><td colspan="6" class="muted"><span data-admin-i18n>没有符合条件的订单。</span></td></tr>
           {{end}}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  {{if gt .List.Pagination.Pages 1}}{{template "list_pager" .List.Pagination}}{{end}}
 </main>
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_order"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -402,7 +415,8 @@
 {{template "admin_topbar" .}}
 <main class="content narrow">
   {{template "flash" .}}
-  <a class="back" href="/admin/orders">{{template "i_arrow_left" .}} 返回订单列表</a>
+  <a class="back" href="{{.OrderBack}}">{{template "i_arrow_left" .}} <span data-admin-i18n>返回订单列表</span></a>
+  <div class="page-head"><div class="titles"><h1 data-admin-i18n>订单详情</h1><p class="sub" data-admin-i18n>查看订单、交付与支付记录</p></div></div>
 
   <div class="panel">
     <div class="panel-head">
@@ -410,67 +424,68 @@
         <h2 class="mono" style="font-size:15px">{{.Order.OrderNo}}</h2>
         <div class="panel-sub">{{datetime .Order.CreatedAt}} · {{.Order.PaymentDriver}}</div>
       </div>
-      <span class="badge {{statusClass .Order.Status}}">{{statusText .Order.Status}}</span>
+      <span class="badge {{statusClass .Order.Status}}"><span data-admin-i18n>{{statusText .Order.Status}}</span></span>
     </div>
     <div class="panel-body">
       <dl class="kv">
-        <dt>商品</dt><dd>{{.Order.ProductName}} × {{.Order.Quantity}}</dd>
-        <dt>单价 / 小计</dt><dd>{{money .Order.UnitPriceCents .Order.Currency}} / {{money .Order.SubtotalCents .Order.Currency}}</dd>
-        <dt>优惠</dt><dd>{{money .Order.DiscountCents .Order.Currency}}{{if .Order.CouponCode}} <span class="badge accent">{{.Order.CouponCode}}</span>{{end}}</dd>
-        <dt>应付金额</dt><dd><strong>{{money .Order.TotalCents .Order.Currency}}</strong></dd>
-        <dt>买家邮箱</dt><dd>{{if .Order.Email}}{{.Order.Email}}{{else}}—{{end}}</dd>
-        <dt>联系方式</dt><dd>{{if .Order.Contact}}{{.Order.Contact}}{{else}}—{{end}}</dd>
-        <dt>支付流水</dt><dd class="mono small">{{if .Order.PaymentTxn}}{{.Order.PaymentTxn}}{{else}}—{{end}}</dd>
-        <dt>时间线</dt><dd class="small">创建 {{datetime .Order.CreatedAt}} · 过期 {{datetime .Order.ExpiresAt}}{{if .Order.PaidAt}} · 支付 {{datetime .Order.PaidAt}}{{end}}{{if .Order.DeliveredAt}} · 发货 {{datetime .Order.DeliveredAt}}{{end}}</dd>
-        {{if .Order.Note}}<dt>备注</dt><dd>{{.Order.Note}}</dd>{{end}}
+        <dt><span data-admin-i18n>商品</span></dt><dd>{{.Order.ProductName}}{{if .Order.VariantName}} · {{.Order.VariantName}}{{end}} × {{.Order.Quantity}}</dd>
+        <dt><span data-admin-i18n>单价 / 小计</span></dt><dd>{{money .Order.UnitPriceCents .Order.Currency}} / {{money .Order.SubtotalCents .Order.Currency}}</dd>
+        <dt><span data-admin-i18n>优惠</span></dt><dd>{{money .Order.DiscountCents .Order.Currency}}{{if .Order.CouponCode}} <span class="badge accent">{{.Order.CouponCode}}</span>{{end}}</dd>
+        <dt><span data-admin-i18n>应付金额</span></dt><dd><strong>{{money .Order.TotalCents .Order.Currency}}</strong></dd>
+        <dt><span data-admin-i18n>买家账号</span></dt><dd>{{if .Order.CustomerID}}<a href="/admin/orders?customer_id={{.Order.CustomerID}}"><span data-admin-i18n>编号</span> {{.Order.CustomerID}} <span data-admin-i18n>· 查看关联订单</span></a>{{else}}<span data-admin-i18n>游客下单</span>{{end}}</dd>
+        <dt><span data-admin-i18n>买家邮箱</span></dt><dd>{{if .Order.Email}}{{.Order.Email}}{{else}}—{{end}}</dd>
+        <dt><span data-admin-i18n>联系方式</span></dt><dd>{{if .Order.Contact}}{{.Order.Contact}}{{else}}—{{end}}</dd>
+        <dt><span data-admin-i18n>支付流水</span></dt><dd class="mono small">{{if .Order.PaymentTxn}}{{.Order.PaymentTxn}}{{else}}—{{end}}</dd>
+        <dt><span data-admin-i18n>时间线</span></dt><dd class="small"><span data-admin-i18n>创建</span> {{datetime .Order.CreatedAt}} <span data-admin-i18n>· 过期</span> {{datetime .Order.ExpiresAt}}{{if .Order.PaidAt}} <span data-admin-i18n>· 支付</span> {{datetime .Order.PaidAt}}{{end}}{{if .Order.DeliveredAt}} <span data-admin-i18n>· 发货</span> {{datetime .Order.DeliveredAt}}{{end}}</dd>
+        {{if .Order.Note}}<dt><span data-admin-i18n>备注</span></dt><dd>{{.Order.Note}}</dd>{{end}}
       </dl>
 
       <div class="actions wrap" style="margin-top:16px">
-        {{if eq .Order.Status "pending"}}
+        {{if .CanManage}}{{if eq .Order.Status "pending"}}
         <form method="post" action="/admin/orders/{{.Order.OrderNo}}/fulfill" class="inline" data-confirm="确认已收到款项并立即发货？">
-          <input type="hidden" name="csrf" value="{{.CSRF}}">
-          <button class="btn primary sm" type="submit">{{template "i_check" .}} 确认收款并发货</button>
+          <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return_to" value="{{.OrderBack}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+          <button class="btn primary sm" type="submit">{{template "i_check" .}} <span data-admin-i18n>确认收款并发货</span></button>
         </form>
         <form method="post" action="/admin/orders/{{.Order.OrderNo}}/close" class="inline" data-confirm="关闭该订单？买家将无法继续支付。">
-          <input type="hidden" name="csrf" value="{{.CSRF}}">
-          <button class="btn sm" type="submit">关闭订单</button>
+          <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return_to" value="{{.OrderBack}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+          <button class="btn sm" type="submit"><span data-admin-i18n>关闭订单</span></button>
         </form>
         {{end}}
         {{if eq .Order.Status "paid"}}
         <form method="post" action="/admin/orders/{{.Order.OrderNo}}/retry" class="inline">
-          <input type="hidden" name="csrf" value="{{.CSRF}}">
-          <button class="btn primary sm" type="submit">{{template "i_refresh" .}} 补发卡密</button>
+          <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return_to" value="{{.OrderBack}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+          <button class="btn primary sm" type="submit">{{template "i_refresh" .}} <span data-admin-i18n>补发卡密</span></button>
         </form>
         {{end}}
-        {{if or (eq .Order.Status "delivered") (eq .Order.Status "paid")}}
+        {{if and (or (eq .Order.Status "delivered") (eq .Order.Status "paid"))}}
         <form method="post" action="/admin/orders/{{.Order.OrderNo}}/refund" class="inline" data-confirm="仅标记为已退款，不会自动回滚卡密。">
-          <input type="hidden" name="csrf" value="{{.CSRF}}">
-          <button class="btn sm danger" type="submit">标记退款</button>
+          <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return_to" value="{{.OrderBack}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+          <button class="btn sm danger" type="submit"><span data-admin-i18n>标记退款</span></button>
         </form>
         {{end}}
-      </div>
+      {{end}}</div>
     </div>
   </div>
 
   <div class="panel">
     <div class="panel-head">
-      <h3>订单备注</h3>
-      <span class="panel-sub">仅后台可见，写入审计</span>
+      <h3><span data-admin-i18n>订单备注</span></h3>
+      <span class="panel-sub"><span data-admin-i18n>仅后台可见，写入审计</span></span>
     </div>
     <div class="panel-body">
       <form method="post" action="/admin/orders/{{.Order.OrderNo}}/note" class="form">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>备注
-          <textarea name="note" rows="3" placeholder="例如：买家已联系，等待补发">{{.Order.Note}}</textarea>
+        <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return_to" value="{{.OrderBack}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+        <label><span data-admin-i18n>备注</span>
+          <textarea name="note" {{if not .CanManage}}readonly{{end}} rows="3" placeholder="例如：买家已联系，等待补发">{{.Order.Note}}</textarea>
         </label>
-        <div class="actions"><button class="btn sm" type="submit">保存备注</button></div>
+        {{if .CanManage}}<div class="actions"><button class="btn sm" type="submit"><span data-admin-i18n>保存备注</span></button></div>{{end}}
       </form>
     </div>
   </div>
 
   {{if .Cards}}
   <div class="panel">
-    <div class="panel-head"><h3>已发卡密</h3><div class="actions"><button class="btn sm" type="button" data-copy-all="#admin-keys">{{template "i_copy" .}} 复制全部</button></div></div>
+    <div class="panel-head"><h3><span data-admin-i18n>已发卡密</span></h3><div class="actions"><button class="btn sm" type="button" data-copy-all="#admin-keys">{{template "i_copy" .}} <span data-admin-i18n>复制全部</span></button></div></div>
     <div class="panel-body">
       <ul class="keys" id="admin-keys">{{range .Cards}}<li><code>{{.Secret}}</code></li>{{end}}</ul>
     </div>
@@ -479,11 +494,11 @@
 
   {{if .Payments}}
   <div class="panel">
-    <div class="panel-head"><h3>支付记录</h3></div>
+    <div class="panel-head"><h3><span data-admin-i18n>支付记录</span></h3></div>
     <div class="panel-body flush">
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th>渠道</th><th>交易号</th><th class="num">金额</th><th>状态</th><th>时间</th></tr></thead>
+          <thead><tr><th><span data-admin-i18n>渠道</span></th><th><span data-admin-i18n>交易号</span></th><th class="num"><span data-admin-i18n>金额</span></th><th><span data-admin-i18n>状态</span></th><th><span data-admin-i18n>时间</span></th></tr></thead>
           <tbody>
           {{range .Payments}}
             <tr>
@@ -504,7 +519,6 @@
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_coupons"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -514,75 +528,77 @@
   {{template "flash" .}}
   <div class="page-head">
     <div class="titles">
-      <h1>优惠码</h1>
-      <div class="sub">支持百分比与固定金额，可限制次数、最低消费、指定商品与有效期</div>
+      <h1><span data-admin-i18n>优惠码</span></h1>
+      <div class="sub"><span data-admin-i18n>支持百分比与固定金额，可限制次数、最低消费、指定商品与有效期</span></div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>创建优惠码</h3></div>
+  {{if ne .User.Role "viewer"}}<details class="panel admin-create" {{if .Error}}open{{end}}>
+    <summary class="panel-head"><h3><span data-admin-i18n>创建优惠码</span></h3><span class="create-toggle">{{template "i_plus" .}} <span class="create-expand"><span data-admin-i18n>展开填写</span></span><span class="create-collapse"><span data-admin-i18n>收起表单</span></span></span></summary>
     <div class="panel-body">
       <form method="post" action="/admin/coupons" class="grid-form">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>优惠码<input type="text" name="code" placeholder="SAVE10" required></label>
-        <label>类型
+        <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+        <label><span data-admin-i18n>优惠码</span><input type="text" name="code" placeholder="SAVE10" required></label>
+        <label><span data-admin-i18n>类型</span>
           <select name="kind">
-            <option value="percent">百分比折扣</option>
-            <option value="fixed">固定金额减免</option>
+            <option value="percent" data-admin-i18n-option>百分比折扣</option>
+            <option value="fixed" data-admin-i18n-option>固定金额减免</option>
           </select>
         </label>
-        <label>百分比<input type="number" name="percent" min="1" max="100" placeholder="10"></label>
-        <label>固定金额（元）<input type="text" name="amount" placeholder="5.00"></label>
-        <label>最低消费（元）<input type="text" name="min_total" placeholder="0"></label>
-        <label>最大次数<span class="hint">0 表示不限</span><input type="number" name="max_uses" value="0" min="0"></label>
-        <label>限定商品
+        <label><span data-admin-i18n>百分比</span><input type="number" name="percent" min="1" max="100" placeholder="10"></label>
+        <label><span data-admin-i18n>固定金额（元）</span><input type="text" name="amount" placeholder="5.00"></label>
+        <label><span data-admin-i18n>最低消费（元）</span><input type="text" name="min_total" placeholder="0"></label>
+        <label><span data-admin-i18n>最大次数</span><span class="hint"><span data-admin-i18n>0 表示不限</span></span><input type="number" name="max_uses" value="0" min="0"></label>
+        <label><span data-admin-i18n>限定商品</span>
           <select name="product_id">
-            <option value="0">全部商品</option>
+            <option value="0" data-admin-i18n-option>全部商品</option>
             {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
           </select>
         </label>
-        <label>过期日期<input type="date" name="expires_at"></label>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 创建</button></div>
+        <label><span data-admin-i18n>过期日期</span><input type="date" name="expires_at"></label>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} <span data-admin-i18n>创建</span></button></div>
       </form>
     </div>
-  </div>
+  </details>
 
-  <div class="panel">
-    <div class="panel-body flush">
+  {{end}}<div class="panel">
+    {{template "admin_filter" .List}}
+<div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>优惠码</th><th>类型</th><th class="num">折扣</th><th class="num">已用</th><th>状态</th><th class="num">操作</th></tr></thead>
+        <table class="table stack">
+          <thead><tr><th><span data-admin-i18n>优惠码</span></th><th><span data-admin-i18n>类型</span></th><th class="num"><span data-admin-i18n>折扣</span></th><th class="num"><span data-admin-i18n>已用</span></th><th><span data-admin-i18n>状态</span></th><th class="num"><span data-admin-i18n>操作</span></th></tr></thead>
           <tbody>
           {{range .Coupons}}
             <tr>
-              <td class="mono">{{.Code}}</td>
-              <td class="secondary-cell">{{if eq .Kind "percent"}}百分比{{else}}固定金额{{end}}</td>
-              <td class="num">{{if eq .Kind "percent"}}{{.Value}}%{{else}}{{money .Value "CNY"}}{{end}}</td>
-              <td class="num">{{.UsedCount}}{{if gt .MaxUses 0}} / {{.MaxUses}}{{end}}</td>
-              <td>
-                {{if .Active}}<span class="badge ok">启用</span>{{else}}<span class="badge muted">停用</span>{{end}}
+              <td class="mono" data-label="优惠码" data-admin-i18n-attrs="data-label">{{.Code}}</td>
+              <td class="secondary-cell" data-label="类型" data-admin-i18n-attrs="data-label">{{if eq .Kind "percent"}}<span data-admin-i18n>百分比</span>{{else}}<span data-admin-i18n>固定金额</span>{{end}}</td>
+              <td class="num" data-label="折扣" data-admin-i18n-attrs="data-label">{{if eq .Kind "percent"}}{{.Value}}%{{else}}{{money .Value "CNY"}}{{end}}</td>
+              <td class="num" data-label="已用次数">{{.UsedCount}}{{if gt .MaxUses 0}} / {{.MaxUses}}{{end}}</td>
+              <td data-label="状态" data-admin-i18n-attrs="data-label">
+                {{if not .Active}}<span class="badge muted"><span data-admin-i18n>停用</span></span>{{else}}{{if expired .ExpiresAt}}<span class="badge warn"><span data-admin-i18n>已过期</span></span>{{else}}<span class="badge ok"><span data-admin-i18n>启用</span></span>{{end}}{{end}}
                 {{if .ExpiresAt}}<span class="secondary-cell"> {{date .ExpiresAt}}</span>{{end}}
               </td>
-              <td class="actions">
-                <form method="post" action="/admin/coupons/{{.ID}}/delete" class="inline" data-confirm="删除该优惠码？">
-                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
-                  <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
-                </form>
+              <td class="actions" data-label="操作" data-admin-i18n-attrs="data-label">
+                {{if ne $.User.Role "viewer"}}<a class="btn sm" href="/admin/lists/coupons/{{.ID}}?return_to={{$.ListReturn}}"><span data-admin-i18n>编辑</span></a>{{end}}
+{{if ne $.User.Role "viewer"}}<form method="post" action="/admin/coupons/{{.ID}}/delete" class="inline" data-confirm="删除该优惠码？">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
+                  <button class="btn sm danger" type="submit" aria-label="删除" data-admin-i18n-attrs="aria-label">{{template "i_trash" .}}</button>
+                </form>{{end}}
               </td>
             </tr>
           {{else}}
-            <tr><td colspan="6" class="muted">暂无优惠码。</td></tr>
+            <tr><td colspan="6" class="muted"><span data-admin-i18n>暂无优惠码。</span></td></tr>
           {{end}}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  {{if gt .List.Pagination.Pages 1}}{{template "list_pager" .List.Pagination}}{{end}}
 </main>
 </div>
 </body>
 </html>{{end}}
-
 {{define "admin_categories"}}{{template "head" .}}
 <body class="app">
 {{template "admin_sidebar" .}}
@@ -592,53 +608,58 @@
   {{template "flash" .}}
   <div class="page-head">
     <div class="titles">
-      <h1>分类</h1>
-      <div class="sub">用于前台商品分组展示</div>
+      <h1><span data-admin-i18n>分类</span></h1>
+      <div class="sub"><span data-admin-i18n>用于前台商品分组展示</span></div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>新增分类</h3></div>
+  {{if .CanManage}}<details class="panel admin-create" {{if .Error}}open{{end}}>
+    <summary class="panel-head"><h3><span data-admin-i18n>新增分类</span></h3><span class="create-toggle">{{template "i_plus" .}} <span class="create-expand"><span data-admin-i18n>展开填写</span></span><span class="create-collapse"><span data-admin-i18n>收起表单</span></span></span></summary>
     <div class="panel-body">
       <form method="post" action="/admin/categories" class="row-form">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>名称<input type="text" name="name" required></label>
-        <label>别名<span class="hint">留空自动生成</span><input type="text" name="slug" placeholder="auto"></label>
-        <label>排序<input type="number" name="sort" value="0"></label>
-        <label class="checkbox"><input type="checkbox" name="visible" value="1" checked><span>前台可见</span></label>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 新增</button></div>
+        <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+        <label><span data-admin-i18n>名称</span><input type="text" name="name" required></label>
+        <label><span data-admin-i18n>别名</span><span class="hint"><span data-admin-i18n>留空自动生成</span></span><input type="text" name="slug" placeholder="auto"></label>
+        <label><span data-admin-i18n>排序</span><input type="number" name="sort" value="0"></label>
+        <label class="checkbox"><input type="checkbox" name="visible" value="1" checked><span><span data-admin-i18n>前台可见</span></span></label>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} <span data-admin-i18n>新增</span></button></div>
       </form>
     </div>
-  </div>
+  </details>{{end}}
 
   <div class="panel">
-    <div class="panel-body flush">
+    {{template "admin_filter" .List}}
+<div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>名称</th><th>别名</th><th class="num">排序</th><th>可见</th><th class="num">操作</th></tr></thead>
+        <table class="table stack">
+          <thead><tr><th><span data-admin-i18n>名称</span></th><th><span data-admin-i18n>别名</span></th><th class="num"><span data-admin-i18n>排序</span></th><th><span data-admin-i18n>可见</span></th><th class="num"><span data-admin-i18n>操作</span></th></tr></thead>
           <tbody>
           {{range .Categories}}
             <tr>
-              <td class="primary-cell">{{.Name}}</td>
-              <td class="mono small">{{.Slug}}</td>
-              <td class="num">{{.Sort}}</td>
-              <td>{{if .Visible}}<span class="badge ok">是</span>{{else}}<span class="badge muted">否</span>{{end}}</td>
-              <td class="actions">
-                <form method="post" action="/admin/categories/{{.ID}}/delete" class="inline" data-confirm="删除该分类？其下商品会变为未分类。">
-                  <input type="hidden" name="csrf" value="{{$.CSRF}}">
-                  <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
-                </form>
+              <td class="primary-cell" data-label="名称" data-admin-i18n-attrs="data-label">{{.Name}}</td>
+              <td class="mono small" data-label="别名" data-admin-i18n-attrs="data-label">{{.Slug}}</td>
+              <td class="num" data-label="排序" data-admin-i18n-attrs="data-label">{{.Sort}}</td>
+              <td data-label="可见性">{{if .Visible}}<span class="badge ok"><span data-admin-i18n>是</span></span>{{else}}<span class="badge muted"><span data-admin-i18n>否</span></span>{{end}}</td>
+              <td class="actions" data-label="操作" data-admin-i18n-attrs="data-label">
+                {{if ne $.User.Role "viewer"}}<a class="btn sm" href="/admin/lists/categories/{{.ID}}?return_to={{$.ListReturn}}"><span data-admin-i18n>编辑</span></a>{{end}}
+{{if ne $.User.Role "viewer"}}<form method="post" action="/admin/categories/{{.ID}}/delete" class="inline" data-confirm="删除该分类？其下商品会变为未分类。">
+                  <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
+                  <button class="btn sm danger" type="submit" aria-label="删除" data-admin-i18n-attrs="aria-label">{{template "i_trash" .}}</button>
+                </form>{{end}}
               </td>
             </tr>
           {{else}}
-            <tr><td colspan="5" class="muted">暂无分类。</td></tr>
+            <tr><td colspan="5" class="muted"><span data-admin-i18n>暂无分类。</span></td></tr>
           {{end}}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  {{if gt .List.Pagination.Pages 1}}{{template "list_pager" .List.Pagination}}{{end}}
 </main>
 </div>
 </body>
 </html>{{end}}
+{{define "admin_list_edit"}}{{template "head" .}}<body class="app">{{template "admin_sidebar" .}}<div class="main">{{template "admin_topbar" .}}<main class="content narrow"><a class="back" href="{{.Back}}"><span data-admin-i18n>← 返回列表</span></a><div class="page-head"><div class="titles"><h1 data-admin-i18n>{{.Title}}</h1></div></div>{{template "flash" .}}<section class="panel"><div class="panel-body"><form method="post" action="{{.FormAction}}" class="form"><input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}<input type="hidden" name="id" value="{{.ID}}">{{range .Fields}}{{if eq .Type "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{else}}{{if eq .Type "checkbox"}}<label class="checkbox"><input type="checkbox" name="{{.Name}}" value="1" {{if .Value}}checked{{end}}><span data-admin-i18n>{{.Label}}</span></label>{{else}}{{if eq .Name "kind"}}<label><span data-admin-i18n>折扣类型</span><select name="kind"><option value="percent" {{if eq .Value "percent"}}selected{{end}} data-admin-i18n-option>百分比折扣</option><option value="fixed" {{if eq .Value "fixed"}}selected{{end}} data-admin-i18n-option>固定金额减免</option></select></label>{{else}}<label><span data-admin-i18n>{{.Label}}</span><input type="{{.Type}}" name="{{.Name}}" value="{{.Value}}" {{if .Required}}required{{end}} autocomplete="off"></label>{{end}}{{end}}{{end}}{{end}}<div class="actions"><button class="btn primary" type="submit"><span data-admin-i18n>保存修改</span></button><a class="btn ghost" href="{{.Back}}" data-admin-i18n>取消</a></div></form></div></section></main></div></body></html>{{end}}
+{{define "dashboard_spark"}}<div class="metric-spark" title="近 7 天变化" aria-hidden="true" data-admin-i18n-attrs="title"><svg viewBox="0 0 100 36" preserveAspectRatio="none"><defs><linearGradient id="{{.ID}}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".2"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><polygon points="0,36 {{.Points}} 100,36" fill="url(#{{.ID}})"/><polyline points="{{.Points}}" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></div>{{end}}

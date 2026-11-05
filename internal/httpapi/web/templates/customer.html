@@ -1,0 +1,55 @@
+{{define "customer_auth"}}{{template "head" .}}
+<body>{{template "shop_nav" .}}
+<main class="container narrow customer-auth">
+ {{template "flash" .}}
+ <section class="panel">
+  <div class="panel-head"><div><h1>{{.Title}}</h1></div>{{template "i_users" .}}</div>
+  <div class="panel-body">
+   <form method="post" action="{{if .Register}}/account/register{{else}}/account/login{{end}}" class="form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="next" value="{{.ReturnTo}}">
+    <label>用户名<input type="text" name="username" value="{{.Username}}" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_]{3,32}" placeholder="3–32 位字母、数字或下划线"></label>
+    <label>密码<input type="password" name="password" autocomplete="{{if .Register}}new-password{{else}}current-password{{end}}" required {{if .Register}}minlength="12"{{end}} maxlength="1024"></label>
+    {{if .Register}}<label>确认密码<input type="password" name="confirm_password" autocomplete="new-password" required minlength="12" maxlength="1024"></label><p class="small muted">密码至少 12 字节。请妥善保存账号信息；此版本不提供邮箱找回密码。</p>{{end}}
+    {{template "captcha_field" .}}
+    <button class="btn primary block" type="submit">{{if .Register}}创建买家账号{{else}}登录{{end}}</button>
+   </form>
+   <p class="small center auth-switch">{{if .Register}}已有账号？<a href="/account/login{{if .ReturnTo}}?next={{.ReturnTo}}{{end}}">立即登录</a>{{else}}还没有账号？<a href="/account/register{{if .ReturnTo}}?next={{.ReturnTo}}{{end}}">注册账号</a>{{end}}</p>
+  </div>
+ </section>
+</main>{{template "footer" .}}</body></html>{{end}}
+{{define "customer_account"}}{{template "head" .}}
+<body>{{template "shop_nav" .}}
+<main class="container">
+ {{template "flash" .}}
+ <section class="panel account-welcome">
+  <div class="panel-head">
+   <div><h1>你好，{{.Customer.Username}}</h1><p class="panel-sub">用户中心 · 注册于 {{date .Customer.CreatedAt}}</p></div>
+   <form method="post" action="/account/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn ghost" type="submit">{{template "i_logout" .}} 退出登录</button></form>
+  </div>
+  <div class="panel-body"><a class="btn primary" href="/">继续选购</a> <a class="btn" href="/query">查询游客订单</a> <a class="btn ghost" href="#account-security">账号安全</a></div>
+ </section>
+ <section class="panel">
+  <div class="panel-head"><div><h2>我的订单</h2><p class="panel-sub">仅显示登录此账号后创建的订单，不会按邮箱自动关联历史订单。</p></div>{{template "i_receipt" .}}</div>
+  <div class="panel-body">
+   {{if .Orders}}
+   <div class="table-wrap"><table class="table stack"><thead><tr><th>订单 / 商品</th><th>金额</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
+    {{range .Orders}}<tr><td data-label="订单 / 商品"><a href="/order/{{.OrderNo}}">{{.OrderNo}}</a><div class="small muted">{{.ProductName}}{{if .VariantName}} · {{.VariantName}}{{end}} × {{.Quantity}}</div></td><td data-label="金额">{{money .TotalCents .Currency}}</td><td data-label="状态"><span class="badge {{statusClass .Status}}"><span data-admin-i18n>{{statusText .Status}}</span></span></td><td data-label="创建时间">{{datetime .CreatedAt}}</td><td data-label="操作"><a class="btn sm" href="/order/{{.OrderNo}}">{{if eq .Status "pending"}}查看 / 支付{{else}}查看详情{{end}}</a></td></tr>{{end}}
+   </tbody></table></div>
+   {{else}}<div class="empty"><h3>暂无订单</h3><p class="muted">登录后下的订单会显示在这里。</p><a class="btn" href="/">浏览商品</a></div>{{end}}
+   <nav aria-label="订单分页">{{if gt .Page 1}}<a class="btn sm" href="/account?page={{.Previous}}">上一页</a>{{end}} <span class="small muted">第 {{.Page}} 页</span> {{if .More}}<a class="btn sm" href="/account?page={{.Next}}">下一页</a>{{end}}</nav>
+  </div>
+ </section>
+
+ <section class="panel" id="account-security">
+  <div class="panel-head"><div><h2>账号安全</h2><p class="panel-sub">修改密码后，所有设备上的买家会话都会失效，需要重新登录。</p></div>{{template "i_shield" .}}</div>
+  <div class="panel-body">
+   <form method="post" action="/account/password" class="form" style="max-width:480px">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label>当前密码<input type="password" name="current_password" autocomplete="current-password" required maxlength="1024"></label>
+    <label>新密码<input type="password" name="new_password" autocomplete="new-password" required minlength="12" maxlength="1024"></label>
+    <label>确认新密码<input type="password" name="confirm_password" autocomplete="new-password" required minlength="12" maxlength="1024"></label>
+    <button class="btn primary" type="submit">更新密码并退出登录</button>
+   </form>
+  </div>
+ </section>
+</main>{{template "footer" .}}</body></html>{{end}}

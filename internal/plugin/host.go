@@ -216,6 +216,9 @@ func (h *Host) Uninstall(ctx context.Context, uid string) error {
 }
 
 func (h *Host) checkHealth(ctx context.Context, m *Manifest) error {
+	if !m.HasPermission(PermHTTPOutbound) || !validEndpointPath(m.Runtime.HealthPath) {
+		return errors.New("plugin: health check not permitted")
+	}
 	url := m.Runtime.BaseURL + m.Runtime.HealthPath
 	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -223,12 +226,14 @@ func (h *Host) checkHealth(ctx context.Context, m *Manifest) error {
 	if err != nil {
 		return err
 	}
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	resp, err := (&http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}).Do(req)
 	if err != nil {
 		return fmt.Errorf("plugin: health check failed: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("plugin: health check returned %d", resp.StatusCode)
 	}
 	return nil
@@ -240,7 +245,8 @@ func (h *Host) CallHook(ctx context.Context, event string, payload map[string]an
 	h.mu.RLock()
 	targets := make([]*Runtime, 0, len(h.active))
 	for _, rt := range h.active {
-		if rt.Manifest.Runtime.Type == "external" && rt.Manifest.Subscribes(event) {
+		permission := hookPermission(event)
+		if KnownHooks[event] && rt.Manifest.Runtime.Type == "external" && rt.Manifest.HasPermission(PermHTTPOutbound) && rt.Manifest.Subscribes(event) && (permission == "" || rt.Manifest.HasPermission(permission)) {
 			targets = append(targets, rt)
 		}
 	}
@@ -274,6 +280,9 @@ func (h *Host) CallHook(ctx context.Context, event string, payload map[string]an
 }
 
 func (h *Host) post(ctx context.Context, rt *Runtime, path string, body []byte) error {
+	if !rt.Manifest.HasPermission(PermHTTPOutbound) || !validEndpointPath(path) {
+		return errors.New("plugin: outbound request not permitted")
+	}
 	if rt.Client == nil {
 		return errors.New("plugin: runtime has no http client")
 	}
@@ -350,7 +359,7 @@ func PaymentDriverName(uid string) string { return "plugin:" + uid }
 func (h *Host) PaymentDrivers() []payment.Driver {
 	var out []payment.Driver
 	for _, rt := range h.Active() {
-		if rt.Manifest.Kind == KindPayment && rt.Manifest.Runtime.Type == "external" {
+		if rt.Manifest.Kind == KindPayment && rt.Manifest.Runtime.Type == "external" && rt.Manifest.HasPermission(PermPaymentProvider) && rt.Manifest.HasPermission(PermHTTPOutbound) {
 			out = append(out, &paymentAdapter{host: h, rt: rt})
 		}
 	}
@@ -375,6 +384,9 @@ func (a *paymentAdapter) Title() string {
 
 // Create implements payment.Driver.
 func (a *paymentAdapter) Create(ctx context.Context, req payment.Request) (*payment.Action, error) {
+	if !a.rt.Manifest.HasPermission(PermPaymentProvider) {
+		return nil, errors.New("plugin: payment provider not permitted")
+	}
 	createPath := "/payment/create"
 	if a.rt.Manifest.Payment != nil && a.rt.Manifest.Payment.CreatePath != "" {
 		createPath = a.rt.Manifest.Payment.CreatePath

@@ -29,11 +29,11 @@ func (d *DB) SetCardsStatus(ctx context.Context, ids []int64, status string) (in
 		return 0, nil
 	}
 	switch status {
-	case CardAvailable, CardSold, CardDisabled:
+	case CardAvailable, CardDisabled:
 	default:
 		return 0, ErrInvalidStatus
 	}
-	q := `UPDATE card_keys SET status = ? WHERE id IN (` + placeholders(len(ids)) + `)`
+	q := `UPDATE card_keys SET status = ? WHERE status != 'sold' AND order_id IS NULL AND id IN (` + placeholders(len(ids)) + `)`
 	args := append([]any{status}, idArgs(ids)...)
 	res, err := d.write.ExecContext(ctx, q, args...)
 	if err != nil {
@@ -48,7 +48,7 @@ func (d *DB) DeleteCards(ctx context.Context, ids []int64) (int64, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	q := `DELETE FROM card_keys WHERE status <> 'sold' AND id IN (` + placeholders(len(ids)) + `)`
+	q := `DELETE FROM card_keys WHERE status <> 'sold' AND order_id IS NULL AND id IN (` + placeholders(len(ids)) + `)`
 	res, err := d.write.ExecContext(ctx, q, idArgs(ids)...)
 	if err != nil {
 		return 0, wrapErr("bulk delete cards", err)

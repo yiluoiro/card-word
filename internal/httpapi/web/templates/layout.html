@@ -1,138 +1,188 @@
 {{define "head"}}<!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-shop-prefix="{{.ShopPrefix}}" data-store-style="{{.ShopStyle}}" data-store-accent="{{.ShopAccent}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<meta name="robots" content="noindex, nofollow">
-<title>{{if .Title}}{{.Title}} · {{end}}{{.Site.Name}}</title>
-<link rel="stylesheet" href="/static/app.css?v={{version}}-3">
-<script src="/static/app.js?v={{version}}-3" defer></script>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="{{.Site.IconURL}}">
+<link rel="apple-touch-icon" href="{{.Site.IconURL}}">
+{{if .SEO}}<meta name="robots" content="{{.SEO.Robots}}">
+<title>{{.SEO.Title}}</title>
+{{if .SEO.Public}}
+<meta name="description" content="{{.SEO.Description}}">
+{{if .SEO.Keywords}}<meta name="keywords" content="{{.SEO.Keywords}}">{{end}}
+<link rel="canonical" href="{{.SEO.Canonical}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.SEO.SiteName}}">
+<meta property="og:title" content="{{.SEO.Title}}">
+<meta property="og:description" content="{{.SEO.Description}}">
+<meta property="og:url" content="{{.SEO.Canonical}}">
+{{if .SEO.Image}}<meta property="og:image" content="{{.SEO.Image}}">{{end}}
+<meta name="twitter:card" content="{{if .SEO.Image}}summary_large_image{{else}}summary{{end}}">
+<meta name="twitter:title" content="{{.SEO.Title}}">
+<meta name="twitter:description" content="{{.SEO.Description}}">
+{{if .SEO.Image}}<meta name="twitter:image" content="{{.SEO.Image}}">{{end}}
+{{if .SEO.Google}}<meta name="google-site-verification" content="{{.SEO.Google}}">{{end}}
+{{if .SEO.Bing}}<meta name="msvalidate.01" content="{{.SEO.Bing}}">{{end}}
+{{end}}{{else}}<meta name="robots" content="noindex, nofollow"><title>{{if .Title}}{{.Title}} · {{end}}{{.Site.Name}}</title>{{end}}
+<link rel="stylesheet" href="/static/app.css?v={{version}}-epay-24">
+<link rel="stylesheet" href="/static/reference.css?v={{version}}-20">
+<link rel="stylesheet" href="/static/shop-templates.css?v={{version}}-1">
+{{if and .Path (hasPrefix .Path "/admin")}}<link rel="stylesheet" href="/static/admin.css?v={{version}}-5">
+<script src="/static/admin.js?v={{version}}-4" defer></script>
+<script src="/static/admin-translations.js?v={{version}}-editions-9" defer></script>
+<script src="/static/admin-i18n.js?v={{version}}-1" defer></script>
+<script src="/static/markdown-editor.js?v={{version}}-1" defer></script>{{end}}
+<script src="/static/theme.js?v={{version}}-6"></script>
+<script src="/static/app.js?v={{version}}-review-21" defer></script>
+<script src="/static/storefront.js?v={{version}}-17" defer></script>
 </head>{{end}}
-
 {{define "shop_nav"}}
 <header class="shop-header">
   <div class="shop-header-inner">
-    <a class="shop-brand" href="/">
-      <span class="brand-mark">{{template "i_logo" .}}</span>
-      <span>{{.Site.Name}}</span>
-    </a>
-    <nav class="shop-nav">
-      <a href="/" class="{{if eq .Path "/"}}active{{end}}">商品</a>
-      <a href="/query" class="{{if hasPrefix .Path "/query"}}active{{end}}">订单查询</a>
-      {{if .User}}
-        <a href="/admin" class="btn sm">{{template "i_grid" .}} 控制台</a>
-      {{else}}
-        <a href="/admin/login" class="btn sm ghost">{{template "i_lock" .}} 管理</a>
-      {{end}}
-      <button class="btn ghost sm" type="button" data-theme-toggle title="切换深浅色">{{template "i_moon" .}}</button>
+    <a class="shop-brand" href="/" aria-label="{{.Site.Name}}"><span class="brand-mark">{{template "site_logo" .}}</span><span>{{.Site.Name}}</span></a>
+    <button class="btn shop-menu-toggle" type="button" data-shop-menu-toggle aria-controls="shop-navigation" aria-expanded="false" hidden>{{template "i_menu" .}} <span data-en="Menu" data-zh="导航">Menu</span></button>
+    <nav class="shop-nav" id="shop-navigation" aria-label="店铺导航">
+      <a href="/" class="{{if eq .Path "/"}}active{{end}}" data-en="Home" data-zh="首页">Home</a>
+      <details class="nav-dropdown"><summary><span data-en="Gift Cards" data-zh="礼品卡">Gift Cards</span>{{template "i_chevron" .}}</summary><div class="nav-dropdown-panel"><a href="/#products" data-en="All Products" data-zh="全部商品">All Products</a><a href="/#popular" data-en="Popular Brands" data-zh="热门品牌">Popular Brands</a><a href="/query" data-en="Track an Order" data-zh="查询订单">Track an Order</a></div></details>
+      <a href="/#about" data-en="About" data-zh="关于我们">About</a><a href="/#faq" data-en="FAQ" data-zh="常见问题">FAQ</a><a href="/#contact" data-en="Contact" data-zh="联系我们">Contact</a>
+
+      <div class="nav-account">
+        <details class="nav-dropdown language-menu"><summary>{{template "i_globe" .}}<span data-language-label>English</span>{{template "i_chevron" .}}</summary><div class="nav-dropdown-panel"><button type="button" data-language="en">English</button><button type="button" data-language="zh">中文</button></div></details>
+        <span class="nav-divider" aria-hidden="true"></span>
+        {{if .Customer}}<a href="/account" class="btn nav-signin">{{template "i_users" .}}<span data-en="My Account" data-zh="用户中心">My Account</span></a>{{else}}<a href="/account/login" class="btn nav-signin" data-en="Sign In" data-zh="登录">Sign In</a><a href="/account/register" class="btn primary nav-signup" data-en="Sign Up" data-zh="注册">Sign Up</a>{{end}}
+      </div>
     </nav>
+    <button class="btn ghost sm shop-theme-toggle" type="button" data-theme-toggle aria-label="切换深浅色" title="切换深浅色">{{template "i_moon" .}}</button>
   </div>
 </header>
-{{end}}
+{{template "public_announcements" .}}
+<button class="btn primary back-to-top" type="button" data-back-to-top hidden><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 11 6-6 6 6M12 5v14"/></svg><span class="back-to-top-label" data-en="Back to top" data-zh="返回顶部">Back to top</span></button>
 
+
+{{end}}
 {{define "admin_sidebar"}}
-<aside class="sidebar" id="admin-nav">
-  <a class="brand-row" href="/admin">
-    <span class="brand-mark">{{template "i_logo" .}}</span>
+<aside class="sidebar" id="admin-nav" aria-label="控制台导航" data-admin-i18n-attrs="aria-label">
+  <button class="drawer-close btn ghost" type="button" data-nav-close aria-label="关闭导航菜单" data-admin-i18n-attrs="aria-label">×</button>
+  <a class="brand-row" href="/admin" title="{{.Site.Name}}">
+    <span class="brand-mark">{{template "site_logo" .}}</span>
     <span class="brand-text">
       <b>{{.Site.Name}}</b>
-      <span>控制台</span>
+
     </span>
   </a>
 
+  <nav class="sidebar-scroll" aria-label="后台功能" data-admin-i18n-attrs="aria-label">
   <div class="nav-group">
-    <p>运营</p>
-    <a class="nav-item {{if eq .Path "/admin"}}active{{end}}" href="/admin">{{template "i_grid" .}} 概览</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/products"}}active{{end}}" href="/admin/products">{{template "i_box" .}} 商品</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/categories"}}active{{end}}" href="/admin/categories">{{template "i_layers" .}} 分类</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/orders"}}active{{end}}" href="/admin/orders">{{template "i_receipt" .}} 订单</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/coupons"}}active{{end}}" href="/admin/coupons">{{template "i_ticket" .}} 优惠码</a>
+    <p><span data-admin-i18n>仪表盘</span></p>
+    <a class="nav-item {{if eq .Path "/admin"}}active{{end}}" href="/admin">{{template "i_grid" .}} <span data-admin-i18n>概览</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/orders"}}active{{end}}" href="/admin/orders">{{template "i_receipt" .}} <span data-admin-i18n>订单</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/products"}}active{{end}}" href="/admin/products">{{template "i_box" .}} <span data-admin-i18n>商品</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/announcements"}}active{{end}}" href="/admin/announcements">{{template "i_receipt" .}} <span data-admin-i18n>公告管理</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/categories"}}active{{end}}" href="/admin/categories">{{template "i_layers" .}} <span data-admin-i18n>分类</span></a>
+
+    <a class="nav-item {{if hasPrefix .Path "/admin/coupons"}}active{{end}}" href="/admin/coupons">{{template "i_ticket" .}} <span data-admin-i18n>优惠码</span></a>
   </div>
 
-  <div class="nav-group">
-    <p>平台</p>
-    <a class="nav-item {{if hasPrefix .Path "/admin/plugins"}}active{{end}}" href="/admin/plugins">{{template "i_puzzle" .}} 应用商城</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/settings"}}active{{end}}" href="/admin/settings">{{template "i_sliders" .}} 设置</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/tokens"}}active{{end}}" href="/admin/tokens">{{template "i_key" .}} API 令牌</a>
-    <a class="nav-item {{if hasPrefix .Path "/admin/audit"}}active{{end}}" href="/admin/audit">{{template "i_shield" .}} 审计日志</a>
-    {{if and .User (eq .User.Role "owner")}}
-    <a class="nav-item {{if hasPrefix .Path "/admin/users"}}active{{end}}" href="/admin/users">{{template "i_users" .}} 团队</a>
-    {{end}}
+  <div class="nav-group"><p><span data-admin-i18n>客户管理</span></p>
+    <a class="nav-item {{if hasPrefix .Path "/admin/customers"}}active{{end}}" href="/admin/customers">{{template "i_users" .}} <span data-admin-i18n>买家管理</span></a>
+    {{if and .User (eq .User.Role "owner")}}<a class="nav-item {{if hasPrefix .Path "/admin/users"}}active{{end}}" href="/admin/users">{{template "i_users" .}} <span data-admin-i18n>团队与权限</span></a>{{end}}
   </div>
 
-  <div class="nav-group quick">
-    <p>快捷</p>
-    <a class="nav-item" href="/" target="_blank" rel="noopener">{{template "i_store" .}} 前台店铺</a>
+  <div class="nav-group"><p><span data-admin-i18n>系统设置</span></p>
+{{if and .User (eq .User.Role "owner")}}<a class="nav-item {{if eq .Path "/admin/appearance"}}active{{end}}" href="/admin/appearance">{{template "i_sliders" .}} <span data-admin-i18n>店铺装修</span></a>{{end}}
+    <a class="nav-item {{if hasPrefix .Path "/admin/plugins"}}active{{end}}" href="/admin/plugins">{{template "i_puzzle" .}} <span data-admin-i18n>应用商城</span></a>
+    {{if and .CanManage}}<a class="nav-item {{if eq .Path "/admin/payments"}}active{{end}}" href="/admin/payments">{{template "i_receipt" .}} <span data-admin-i18n>支付配置</span></a>{{end}}
+    <a class="nav-item {{if eq .Path "/admin/seo"}}active{{end}}" href="/admin/seo">{{template "i_globe" .}} <span data-admin-i18n>SEO 设置</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/settings"}}active{{end}}" href="/admin/settings">{{template "i_sliders" .}} <span data-admin-i18n>配置管理</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/tokens"}}active{{end}}" href="/admin/tokens">{{template "i_key" .}} <span data-admin-i18n>API 接口</span></a>
+    <a class="nav-item {{if hasPrefix .Path "/admin/audit"}}active{{end}}" href="/admin/audit">{{template "i_shield" .}} <span data-admin-i18n>日志中心</span></a>
+
   </div>
 
-  <div class="sidebar-foot">
+  </nav>
+  <div class="sidebar-foot"><p class="sidebar-help-label"><span data-admin-i18n>帮助与支持</span></p><button class="nav-help" type="button" data-help-open>{{template "i_headphones" .}} <span data-admin-i18n>查询帮助</span> {{template "i_external" .}}</button>
+    <button class="sidebar-density" type="button" data-density-toggle aria-pressed="false">{{template "i_layers" .}} <span><span data-admin-i18n>紧凑列表</span></span><span class="density-state"><span data-admin-i18n>关闭</span></span></button>
     <div class="user-chip">
-      <a class="avatar" href="/admin/account" title="账号安全">{{if .User}}{{printf "%.1s" .User.Username}}{{else}}?{{end}}</a>
+      <a class="avatar" href="/admin/account" title="账号安全" data-admin-i18n-attrs="title">{{if .User}}{{printf "%.1s" .User.Username}}{{else}}?{{end}}</a>
       <a class="brand-text" href="/admin/account" style="min-width:0">
-        <span class="u-name">{{if .User}}{{.User.Username}}{{else}}未登录{{end}}</span>
-        <span class="u-role">账号安全</span>
+        <span class="u-name">{{if .User}}{{.User.Username}}{{else}}<span data-admin-i18n>未登录</span>{{end}}</span>
+        <span class="u-role">{{if .User}}{{if eq .User.Role "owner"}}<span data-admin-i18n>所有者</span>{{else}}{{if eq .User.Role "admin"}}<span data-admin-i18n>管理员</span>{{else}}<span data-admin-i18n>只读成员</span>{{end}}{{end}}{{end}} <span data-admin-i18n>· 账号安全</span></span>
       </a>
       <form method="post" action="/admin/logout" class="inline" style="margin-left:auto">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <button class="btn ghost sm" type="submit" title="退出登录">{{template "i_logout" .}}</button>
+        <button class="btn ghost sm" type="submit" aria-label="退出登录" title="退出登录" data-admin-i18n-attrs="aria-label title">{{template "i_logout" .}}</button>
       </form>
     </div>
   </div>
 </aside>
 <div class="nav-scrim" data-nav-scrim hidden></div>
 {{end}}
-
 {{define "admin_topbar"}}
 <header class="topbar">
-  <button class="nav-toggle" type="button" data-nav-toggle aria-label="打开导航菜单" aria-controls="admin-nav" aria-expanded="false">{{template "i_menu" .}}</button>
+  <button class="nav-toggle" type="button" data-nav-toggle aria-label="打开导航菜单" aria-controls="admin-nav" aria-expanded="false" data-admin-i18n-attrs="aria-label">{{template "i_menu" .}}</button>
   <div class="crumbs">
-    <a href="/admin" class="muted">控制台</a>
-    <span class="muted">/</span>
-    <b>{{if .Title}}{{.Title}}{{else}}概览{{end}}</b>
+    <a href="/admin" class="crumb-home" aria-label="后台首页" data-admin-i18n-attrs="aria-label">{{template "i_home" .}}</a><a href="/admin" class="muted"><span data-admin-i18n>首页</span></a>
+    <span class="muted">{{template "i_chevron_right" .}}</span>
+    <b data-admin-i18n>{{if .Title}}{{.Title}}{{else}}<span data-admin-i18n>概览</span>{{end}}</b>
   </div>
   <div class="spacer"></div>
   <div class="topbar-actions">
-    {{if .Site.Maintenance}}<span class="badge warn"><span class="dot"></span>维护模式</span>{{end}}
-    <a class="btn ghost sm" href="/" target="_blank" rel="noopener">{{template "i_external" .}} 访问店铺</a>
-    <button class="btn ghost sm" type="button" data-theme-toggle title="切换深浅色">{{template "i_moon" .}}</button>
+    {{if .Site.Maintenance}}<span class="badge warn"><span data-admin-i18n>维护模式</span></span>{{end}}
+    {{template "admin_language" .}}<span class="topbar-divider" aria-hidden="true"></span>
+    <button class="btn topbar-icon workspace-search-trigger" type="button" data-command-open aria-label="查找后台功能" title="查找功能 · Ctrl/Cmd K" data-admin-i18n-attrs="aria-label title">{{template "i_search" .}}</button>
+    <button class="btn topbar-icon theme-control" type="button" data-theme-toggle aria-label="切换深浅色" title="切换深浅色" data-admin-i18n-attrs="aria-label title">{{template "i_sun" .}}</button>
+    <button class="btn topbar-icon" type="button" data-admin-refresh aria-label="刷新当前页面" title="刷新当前页面" data-admin-i18n-attrs="aria-label title">{{template "i_refresh" .}}</button>
+    <a class="btn topbar-icon visit-store" href="/" target="_blank" rel="noopener" aria-label="访问店铺" title="访问店铺" data-admin-i18n-attrs="aria-label title">{{template "i_external" .}}</a>
   </div>
 </header>
+<dialog class="admin-help-dialog" aria-labelledby="admin-help-title"><div class="panel-head"><h2 id="admin-help-title"><span data-admin-i18n>经营帮助</span></h2><button class="btn sm ghost" type="button" data-help-close aria-label="关闭帮助" data-admin-i18n-attrs="aria-label"><span data-admin-i18n>关闭 · Esc</span></button></div><div class="panel-body"><p class="muted"><span data-admin-i18n>从上架到交付，常用操作都在这里。</span></p><a href="/admin/products"><span class="quick-icon">{{template "i_box" .}}</span><span><b><span data-admin-i18n>商品与库存</span></b><small><span data-admin-i18n>编辑商品，在商品详情中导入卡密。</span></small></span>{{template "i_chevron_right" .}}</a><a href="/admin/orders"><span class="quick-icon">{{template "i_receipt" .}}</span><span><b><span data-admin-i18n>处理订单</span></b><small><span data-admin-i18n>筛选待支付或待补发订单，查看交付记录。</span></small></span>{{template "i_chevron_right" .}}</a><a href="/admin/account"><span class="quick-icon">{{template "i_shield" .}}</span><span><b><span data-admin-i18n>账号安全</span></b><small><span data-admin-i18n>更新密码，启用两步验证。</span></small></span>{{template "i_chevron_right" .}}</a><div class="help-tip"><span data-admin-i18n>按 Ctrl / ⌘ + K，可快速查找后台功能。</span></div></div></dialog>
+<dialog class="workspace-command" aria-labelledby="command-title">
+  <div class="workspace-section-head"><h2 id="command-title"><span data-admin-i18n>查找后台功能</span></h2><button type="button" class="btn ghost sm" data-command-close aria-label="关闭功能查找" data-admin-i18n-attrs="aria-label"><span data-admin-i18n>关闭 · Esc</span></button></div>
+  <label class="command-label"><span data-admin-i18n>功能名称</span><input type="search" data-command-query placeholder="输入商品、订单、投诉、设置…" autocomplete="off" data-admin-i18n-attrs="placeholder"></label>
+  <nav data-command-results aria-label="匹配的后台功能" data-admin-i18n-attrs="aria-label"></nav><p class="muted small" data-command-empty hidden><span data-admin-i18n>没有匹配的功能，试试其他关键词。</span></p>
+  <form class="command-order-search" method="get" action="/admin/orders"><label><span data-admin-i18n>直接查订单</span><input type="search" name="q" placeholder="订单号、商品或邮箱" required maxlength="200" data-admin-i18n-attrs="placeholder"></label><button class="btn primary" type="submit"><span data-admin-i18n>查询订单</span></button></form>
+</dialog>
 {{end}}
-
 {{define "flash"}}
-{{if .Flash}}<div class="alert ok" data-toast="ok">{{template "i_check" .}}<div>{{.Flash}}</div></div>{{end}}
-{{if .Error}}<div class="alert err" data-toast="err">{{template "i_alert" .}}<div>{{.Error}}</div></div>{{end}}
+{{if .Flash}}<div class="alert ok" role="status" data-toast="ok">{{template "i_check" .}}<div data-admin-i18n>{{.Flash}}</div></div>{{end}}
+{{if .Error}}<div class="alert err" role="alert" data-toast="err">{{template "i_alert" .}}<div data-admin-i18n>{{.Error}}</div></div>{{end}}
 {{end}}
-
 {{define "pager"}}
 {{if gt .TotalPages 1}}
 <div class="pager">
-  {{if gt .Page 1}}<a class="btn sm" href="?{{.QueryBase}}page={{add .Page -1}}">上一页</a>{{end}}
-  <span class="muted small">第 {{.Page}} / {{.TotalPages}} 页 · 共 {{.Total}} 条</span>
-  {{if lt .Page .TotalPages}}<a class="btn sm" href="?{{.QueryBase}}page={{add .Page 1}}">下一页</a>{{end}}
+  {{if gt .Page 1}}<a class="btn sm" href="?{{.QueryBase}}page={{add .Page -1}}"><span data-admin-i18n>上一页</span></a>{{end}}
+  <span class="muted small"><span data-admin-i18n>第</span> {{.Page}} / {{.TotalPages}} 页 · 共 {{.Total}} <span data-admin-i18n>条</span></span>
+  {{if lt .Page .TotalPages}}<a class="btn sm" href="?{{.QueryBase}}page={{add .Page 1}}"><span data-admin-i18n>下一页</span></a>{{end}}
 </div>
-{{else if .Total}}
-<p class="muted small">共 {{.Total}} 条</p>
+{{else}}{{if .Total}}
+<p class="muted small"><span data-admin-i18n>共</span> {{.Total}} <span data-admin-i18n>条</span></p>
+{{end}}{{end}}
 {{end}}
-{{end}}
-
-{{define "footer"}}
-<footer class="footer">
-  <div class="footer-inner">
-    <p>{{.Site.Name}} · card word v{{version}} · Apache-2.0</p>
-    <div class="footer-links">
-      {{if .Site.Contact}}<span class="muted">{{.Site.Contact}}</span>{{end}}
-      <a href="/query">订单查询</a>
-      <a href="/admin/login">管理入口</a>
-    </div>
+{{define "list_pager"}}
+<nav class="pager list-pager" aria-label="列表分页" data-admin-i18n-attrs="aria-label">
+  <span class="muted small" role="status"><span data-admin-i18n>共</span> {{.Total}} <span data-admin-i18n>条</span>{{if .Total}} <span data-admin-i18n>· 显示</span> {{.Start}}–{{.End}} <span data-admin-i18n>条</span>{{end}}</span>
+  {{if gt .Pages 1}}
+  <div class="pager-links">
+    {{if .FirstURL}}<a class="btn sm" href="{{.FirstURL}}" aria-label="第一页" data-admin-i18n-attrs="aria-label"><span data-admin-i18n>首页</span></a><a class="btn sm" href="{{.PreviousURL}}" rel="prev"><span data-admin-i18n>上一页</span></a>{{else}}<span class="btn sm" aria-disabled="true"><span data-admin-i18n>上一页</span></span>{{end}}
+    <span class="small"><span data-admin-i18n>第</span> {{.Page}} / {{.Pages}} <span data-admin-i18n>页</span></span>
+    {{if .NextURL}}<a class="btn sm" href="{{.NextURL}}" rel="next"><span data-admin-i18n>下一页</span></a><a class="btn sm" href="{{.LastURL}}" aria-label="最后一页" data-admin-i18n-attrs="aria-label"><span data-admin-i18n>末页</span></a>{{else}}<span class="btn sm" aria-disabled="true"><span data-admin-i18n>下一页</span></span>{{end}}
   </div>
-</footer>
+  <form class="pager-jump" method="get" action="{{.Path}}{{if .Anchor}}#{{.Anchor}}{{end}}">
+    {{range $name, $values := .Filters}}{{range $values}}<input type="hidden" name="{{$name}}" value="{{.}}">{{end}}{{end}}
+    <label><span data-admin-i18n>跳至</span> <input type="number" name="{{.PageField}}" value="{{.Page}}" min="1" max="{{.Pages}}" required aria-label="目标页码" data-admin-i18n-attrs="aria-label"> <span data-admin-i18n>页</span></label>
+    <button class="btn sm" type="submit"><span data-admin-i18n>跳转</span></button>
+  </form>
+  {{end}}
+</nav>
 {{end}}
-
-{{/* ---------- icon set (lucide-style, inline SVG, no emoji) ---------- */}}
-
-{{define "i_logo"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><path d="M7 15h3"/></svg>{{end}}
+{{define "footer"}}
+<footer class="footer"><div class="footer-inner">
+  <div class="footer-identity"><a href="/" class="shop-brand"><span class="brand-mark">{{template "site_logo" .}}</span><span>{{.Site.Name}}</span></a><p data-en="Digital Gift Cards" data-zh="数字礼品卡">Digital Gift Cards</p></div>
+  <div class="footer-links"><a href="/#products" data-en="Browse Cards" data-zh="浏览商品">Browse Cards</a><a href="/query" data-en="Track Order" data-zh="订单查询">Track Order</a><a href="/account" data-en="My Account" data-zh="用户中心">My Account</a><a href="/admin" data-en="Merchant Console" data-zh="管理后台">Merchant Console</a></div>
+</div><div class="footer-bottom"><span>© {{.CurrentYear}} {{.Site.Name}}</span><span data-en="Brand names belong to their respective owners." data-zh="品牌名称及标识归各自权利人所有。">Brand names belong to their respective owners.</span><div class="footer-languages"><button type="button" data-language="en">EN</button><span>/</span><button type="button" data-language="zh">中文</button></div></div></footer>
+{{end}}
+{{define "i_logo"}}<img class="cw-logo" src="/static/reference/brand.svg" width="64" height="49" alt="">{{end}}
 {{define "i_grid"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>{{end}}
 {{define "i_box"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9-5-9 5v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>{{end}}
 {{define "i_layers"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>{{end}}
@@ -164,3 +214,36 @@
 {{define "i_menu"}}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>{{end}}
 {{define "i_eye"}}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>{{end}}
 {{define "i_users"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>{{end}}
+{{define "i_globe"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 6h14M5 18h14"/></svg>{{end}}
+{{define "i_chevron"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>{{end}}
+{{define "i_headphones"}}<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 13v-2a8 8 0 0 1 16 0v6q0 4-6 4"/><rect x="2" y="11" width="4" height="8" rx="2"/><rect x="18" y="11" width="4" height="8" rx="2"/><path d="M12 21h3"/></svg>{{end}}
+{{define "i_tag"}}<svg viewBox="0 0 24 24" width="25" height="25" fill="currentColor" aria-hidden="true"><path d="M12 2h7a3 3 0 0 1 3 3v7L12 22a2 2 0 0 1-3 0l-7-7a2 2 0 0 1 0-3L12 2Z"/><circle cx="17" cy="7" r="2" fill="var(--surface)"/></svg>{{end}}
+{{define "admin_filter"}}{{with .}}<form class="toolbar admin-list-filter" method="get" action="{{.Path}}{{if .Anchor}}#{{.Anchor}}{{end}}" {{if .Anchor}}id="{{.Anchor}}"{{end}}>
+{{range $k, $vs := .Other}}{{range $vs}}<input type="hidden" name="{{$k}}" value="{{.}}">{{end}}{{end}}
+<div class="filter-primary">
+<label class="filter-search"><span data-admin-i18n>搜索</span><input type="search" name="{{.Prefix}}q" value="{{.Filter.Search}}" placeholder="{{.Hint}}" data-admin-i18n-attrs="placeholder" maxlength="200"></label>
+{{if .Variants}}<label><span data-admin-i18n>规格</span><select name="variant_id"><option value="">全部规格</option>{{range .Variants}}<option value="{{.ID}}" {{if eq $.Filter.VariantID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>{{end}}
+{{if .Audit}}<label>动作前缀<input name="action" value="{{.Filter.Status}}" placeholder="如 order."></label>{{end}}
+{{if .States}}<label><span data-admin-i18n>状态</span><select name="{{.Prefix}}status"><option value="" data-admin-i18n-option>全部状态</option>{{range .States}}<option value="{{.Value}}" {{if eq $.Filter.Status .Value}}selected{{end}} data-admin-i18n-option>{{.Label}}</option>{{end}}</select></label>{{end}}
+{{if .Kinds}}<label><span data-admin-i18n>类型</span><select name="{{.Prefix}}kind"><option value="" data-admin-i18n-option>全部类型</option>{{range .Kinds}}<option value="{{.Value}}" {{if eq $.Filter.Kind .Value}}selected{{end}} data-admin-i18n-option>{{.Label}}</option>{{end}}</select></label>{{end}}
+<label class="filter-size"><span data-admin-i18n>每页</span><select name="{{.Prefix}}size"><option {{if eq .Filter.Size 20}}selected{{end}} data-admin-i18n-option>20</option><option {{if eq .Filter.Size 50}}selected{{end}} data-admin-i18n-option>50</option><option {{if eq .Filter.Size 100}}selected{{end}} data-admin-i18n-option>100</option></select></label>
+<div class="filter-actions"><button class="btn primary" type="submit"><span data-admin-i18n>筛选</span></button><a class="btn" href="{{.Reset}}"><span data-admin-i18n>重置</span></a></div>
+</div>
+{{if or .Dates .Currency}}<details class="filter-more" {{if or .Filter.From .Filter.To .Filter.Currency}}open{{end}}><summary><span data-admin-i18n>更多筛选</span><span class="small muted">{{if or .Filter.From .Filter.To .Filter.Currency}}<span data-admin-i18n>已启用</span>{{else}}<span data-admin-i18n>日期</span>{{if .Currency}}<span data-admin-i18n>、币种</span>{{end}}{{end}}</span>{{template "i_chevron" .}}</summary><div class="filter-secondary">
+{{if .Dates}}<label><span data-admin-i18n>创建起日（UTC）</span><input type="date" name="{{.Prefix}}from" value="{{.Filter.From}}"></label><label><span data-admin-i18n>截至（含）</span><input type="date" name="{{.Prefix}}to" value="{{.Filter.To}}"></label>{{end}}
+{{if .Currency}}<label><span data-admin-i18n>币种</span><input name="{{.Prefix}}currency" value="{{.Filter.Currency}}" maxlength="8" placeholder="如 CNY" data-admin-i18n-attrs="placeholder"></label>{{end}}
+</div></details>{{end}}
+</form>{{template "list_pager" .Pagination}}{{end}}{{end}}
+{{define "i_home"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-8 9 8v10a1 1 0 0 1-1 1h-5v-8H9v8H4a1 1 0 0 1-1-1Z"/></svg>{{end}}
+{{define "i_sun"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>{{end}}
+{{define "i_chart"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M5 16v-4m5 4V9m5 7v-5m5 5V5M4 9l6-5 5 3 5-5M16 2h4v4"/></svg>{{end}}
+{{define "i_wallet"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 9h18M16 14h5"/><circle cx="16" cy="15" r="1"/></svg>{{end}}
+{{define "i_calendar"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v5m10-5v5M3 11h18M8 15h2m4 0h2M8 18h2"/></svg>{{end}}
+{{define "i_diamond"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 4-6h10l4 6-9 12L3 9Zm0 0h18M9 3 7 9l5 12 5-12-2-6"/></svg>{{end}}
+{{define "i_circle_close"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg>{{end}}
+{{define "i_chevron_right"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>{{end}}
+{{define "i_rocket"}}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16 8 12c1-5 6-9 13-9 0 7-4 12-9 13ZM8 12l-5 1 2-5 5-2m2 10-1 5 5-2 2-5M5 16l-2 5 5-2"/><circle cx="16" cy="8" r="2"/></svg>{{end}}
+{{define "admin_language"}}<details class="admin-language" data-admin-language-menu>
+<summary class="admin-locale" aria-label="选择后台语言" data-admin-language-toggle>{{template "i_globe" .}}<span data-admin-language-label>简体中文</span>{{template "i_chevron" .}}</summary>
+<div class="admin-language-options" role="group" aria-label="Language"><button type="button" data-admin-language="zh" lang="zh-CN" aria-pressed="true">简体中文</button><button type="button" data-admin-language="en" lang="en" aria-pressed="false">English</button></div>
+</details>{{end}}

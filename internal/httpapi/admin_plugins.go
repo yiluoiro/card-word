@@ -8,15 +8,16 @@ import (
 	"github.com/yiluoiro/card-word/internal/cryptoutil"
 	"github.com/yiluoiro/card-word/internal/market"
 	"github.com/yiluoiro/card-word/internal/plugin"
+	"github.com/yiluoiro/card-word/internal/store"
 )
 
 func (s *Server) handleAdminPlugins(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	records, err := s.db.ListPlugins(ctx, false)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载插件失败。")
+	raw, view, ok := s.adminList(w, r, s.db, "plugins", "plugins_")
+	if !ok {
 		return
 	}
+	records := raw.([]store.PluginRecord)
 	installed := make([]map[string]any, 0, len(records))
 	for _, rec := range records {
 		m, err := plugin.ParseManifest([]byte(rec.Manifest))
@@ -32,19 +33,24 @@ func (s *Server) handleAdminPlugins(w http.ResponseWriter, r *http.Request) {
 		view["Values"] = settings
 		installed = append(installed, view)
 	}
+	marketView := listView(r, "market", "market_")
 	var marketEntries []any
 	var marketErr string
-	if s.market != nil {
-		entries, err := s.market.List(ctx, s.cfg.MarketURL)
+	{
+		entries, err := s.marketEntries(ctx)
 		if err != nil {
 			marketErr = err.Error()
 		}
 		for _, e := range entries {
-			marketEntries = append(marketEntries, e)
+			if (marketView.Filter.Kind == "" || marketView.Filter.Kind == e.Kind) && strings.Contains(strings.ToLower(e.Name+" "+e.UID+" "+e.Author), strings.ToLower(marketView.Filter.Search)) {
+				marketEntries = append(marketEntries, e)
+			}
 		}
 	}
+	marketView.finish(len(marketEntries))
+	marketEntries = marketEntries[marketView.Pagination.Offset:marketView.Pagination.End]
 	s.render(w, r, "admin_plugins", map[string]any{
-		"Title":             "应用商城",
+		"Title": "应用商城", "List": view, "MarketList": marketView,
 		"Installed":         installed,
 		"Market":            marketEntries,
 		"MarketError":       marketErr,
@@ -169,7 +175,7 @@ func (s *Server) handleAdminPluginSettings(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleAdminMarketInstall(w http.ResponseWriter, r *http.Request) {
-	if s.plugins == nil || s.market == nil {
+	if s.plugins == nil {
 		flashRedirect(w, r, "/admin/plugins", "", "商城不可用。")
 		return
 	}
@@ -182,7 +188,7 @@ func (s *Server) handleAdminMarketInstall(w http.ResponseWriter, r *http.Request
 		return
 	}
 	uid := strings.TrimSpace(r.FormValue("uid"))
-	entries, err := s.market.List(r.Context(), s.cfg.MarketURL)
+	entries, err := s.marketEntries(r.Context())
 	if err != nil && len(entries) == 0 {
 		flashRedirect(w, r, "/admin/plugins", "", "商城索引不可用。")
 		return
@@ -198,7 +204,12 @@ func (s *Server) handleAdminMarketInstall(w http.ResponseWriter, r *http.Request
 		flashRedirect(w, r, "/admin/plugins", "", "商城条目不存在。")
 		return
 	}
-	pkg, err := s.market.Download(r.Context(), *chosen, plugin.MaxPackageBytes)
+	var pkg []byte
+	if s.market != nil {
+		pkg, err = s.market.Download(r.Context(), *chosen, plugin.MaxPackageBytes)
+	} else {
+		err = store.ErrNotFound
+	}
 	if err != nil {
 		flashRedirect(w, r, "/admin/plugins", "", "下载失败："+err.Error())
 		return

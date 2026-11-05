@@ -126,6 +126,20 @@ func (d *DB) migrate(ctx context.Context) error {
 	if _, err := d.write.ExecContext(ctx, string(schema)); err != nil {
 		return fmt.Errorf("store: apply schema: %w", err)
 	}
+	for _, table := range []string{"orders", "card_keys"} {
+		if err := d.ensureColumn(ctx, table, "variant_id", "variant_id INTEGER NOT NULL DEFAULT 0"); err != nil {
+			return err
+		}
+	}
+	if err := d.ensureColumn(ctx, "orders", "payment_method", "payment_method TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := d.ensureColumn(ctx, "orders", "variant_name", "variant_name TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if _, err := d.write.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_cards_variant ON card_keys(product_id,variant_id,status)`); err != nil {
+		return err
+	}
 	// Existing databases created before the account upgrade need additive
 	// migrations; CREATE TABLE IF NOT EXISTS does not add columns.
 	for _, col := range []struct{ name, ddl string }{
@@ -150,7 +164,14 @@ func (d *DB) migrate(ctx context.Context) error {
 	if err := d.ensureColumn(ctx, "products", "cover_path", "cover_path TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
-	if _, err := d.write.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
+	if err := d.ensureColumn(ctx, "orders", "customer_id", "customer_id INTEGER REFERENCES customers(id)"); err != nil {
+		return err
+	}
+	// This index must be created after the additive migration on older files.
+	if _, err := d.write.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id, id DESC)`); err != nil {
+		return wrapErr("index customer orders", err)
+	}
+	if _, err := d.write.ExecContext(ctx, "PRAGMA user_version = 2"); err != nil {
 		return fmt.Errorf("store: set user_version: %w", err)
 	}
 	return nil
@@ -174,6 +195,10 @@ func (d *DB) ensureColumn(ctx context.Context, table, column, ddl string) error 
 		if name == column {
 			found = true
 		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return wrapErr("inspect table "+table, err)
 	}
 	rows.Close()
 	if found {

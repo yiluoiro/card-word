@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 360" fill="none">
+<defs>
+<linearGradient id="a" x1=".1" y1="0" x2=".8" y2=".8"><stop stop-color="#c6d8ff"/><stop offset="1" stop-color="#efecff" stop-opacity="0"/></linearGradient>
+<linearGradient id="b" x1=".15" y1="0" x2=".7" y2=".8"><stop stop-color="#aba1ff"/><stop offset=".6" stop-color="#d9d7ff"/><stop offset="1" stop-color="#f2eefe" stop-opacity="0"/></linearGradient>
+<linearGradient id="c" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#bba2ff"/><stop offset=".45" stop-color="#efbfe6"/><stop offset=".74" stop-color="#ffe1d5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs><path d="M95-22h590c-76 88-166 120-188 222-20 92-121 135-242 123C105 309-30 155 95-22Z" fill="url(#a)" opacity=".48"/>
+<path d="M202-20h380c-80 69-160 86-187 170-26 84-65 129-151 151C113 245 101 83 202-20Z" fill="url(#b)" opacity=".52"/>
+<path d="M263-25h387c-10 67-29 97-110 137-124 60-201 90-243 209-97-82-127-227-34-346Z" fill="url(#c)" opacity=".53"/>
+<path d="M466-20h137c-37 62-88 92-173 126-121 48-170 99-191 169-25-106 38-187 127-232 46-23 78-39 100-63Z" fill="#fff" opacity=".22"/></svg>

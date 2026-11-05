@@ -34,6 +34,7 @@ const (
 // browser enforced: the cookie must be Secure, Path=/ and carry no Domain, so
 // a sibling subdomain cannot overwrite the admin session cookie.
 func (s *Server) cookieName(base string) string {
+
 	if s.cfg.Secure() {
 		return "__Host-" + base
 	}
@@ -142,6 +143,9 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		h.Set("Cross-Origin-Resource-Policy", "same-origin")
 		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		h.Set("X-Permitted-Cross-Domain-Policies", "none")
+		if !strings.HasPrefix(r.URL.Path, "/static/") && !strings.HasPrefix(r.URL.Path, "/media/") {
+			h.Set("Cache-Control", "no-store")
+		}
 		if s.cfg.Secure() {
 			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
@@ -181,12 +185,16 @@ func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 				now := time.Now().UTC()
 				if now.Before(stored.ExpiresAt) && now.Sub(stored.LastSeenAt) < s.cfg.SessionIdle {
 					sess = stored
-					expires := now.Add(s.cfg.SessionTTL)
+					expires := stored.ExpiresAt
 					_ = s.db.TouchSession(ctx, stored.ID, now, expires)
 					s.setSessionCookies(w, c.Value, stored.CSRFToken, expires)
 					user, err := s.db.UserByID(ctx, stored.UserID)
-					if err == nil {
+					if err == nil && !user.Disabled {
 						ctx = context.WithValue(ctx, ctxUser, user)
+					} else {
+						sess = nil
+						_ = s.db.DeleteSession(ctx, stored.ID)
+						s.clearSessionCookies(w)
 					}
 				} else {
 					_ = s.db.DeleteSession(ctx, stored.ID)
@@ -209,6 +217,7 @@ func (s *Server) sessionMiddleware(next http.Handler) http.Handler {
 				token, _ = cryptoutil.RandomToken(32)
 				s.setCSRFCookie(w, token)
 			}
+
 			ctx = context.WithValue(ctx, ctxCSRF, token)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))

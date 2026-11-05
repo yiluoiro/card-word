@@ -1,0 +1,27 @@
+{{define "admin_seo"}}{{template "head" .}}
+<body class="app">{{template "admin_sidebar" .}}<div class="main">{{template "admin_topbar" .}}
+<main class="content narrow">{{template "flash" .}}
+<div class="page-head"><div class="titles"><span class="overline">SEARCH &amp; SHARING</span><h1 data-admin-i18n>SEO 设置</h1><p class="sub" data-admin-i18n>设置当前店铺在搜索结果和分享链接中的展示信息。</p></div></div>
+<form method="post" action="/admin/seo" class="form" {{if .CanManage}}data-unsaved-warning="{{if .Error}}true{{end}}"{{end}}>
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<fieldset class="settings-fields" {{if not .CanManage}}disabled{{end}}>
+<section class="panel"><div class="panel-head"><h2 data-admin-i18n>搜索展示</h2></div><div class="panel-body form">
+<label><span data-admin-i18n>首页标题</span><input name="seo.title" value="{{.SEOSettings.Title}}" maxlength="120" placeholder="{{.Site.Name}}" data-seo-title></label>
+<label><span data-admin-i18n>首页描述</span><textarea rows="3" name="seo.description" maxlength="320" placeholder="{{.Site.Tagline}}" data-seo-description>{{.SEOSettings.Description}}</textarea></label>
+<label><span data-admin-i18n>关键词（可选）</span><input name="seo.keywords" value="{{.SEOSettings.Keywords}}" maxlength="200"><span class="hint" data-admin-i18n>多个关键词用逗号分隔。</span></label>
+<label><span data-admin-i18n>商品标题格式</span><input name="seo.product_title" value="{{.SEOSettings.ProductTitle}}" maxlength="180" dir="auto"><span class="hint" data-admin-i18n>必须包含 {product}（商品名），可使用 {site}（店铺名）。商品描述自动取自商品简介或详情。</span></label>
+<div class="seo-preview"><span class="small muted" data-admin-i18n>首页搜索结果预览</span><small>{{.SEOBase}}/</small><strong data-seo-preview-title>{{.PreviewTitle}}</strong><p data-seo-preview-description>{{.PreviewDescription}}</p></div><p class="hint" data-admin-i18n>此处为展示预览，搜索引擎可能采用不同的标题与摘要。</p>
+</div></section>
+<section class="panel"><div class="panel-head"><h2 data-admin-i18n>收录与分享</h2></div><div class="panel-body form">
+<label class="checkbox"><input type="checkbox" name="seo.enabled" value="1" {{if .SEOSettings.Enabled}}checked{{end}}><span data-admin-i18n>允许搜索引擎收录公开页面</span></label>
+<p class="hint" data-admin-i18n>仅影响当前店铺的公开目录和商品。登录、订单、支付、账户与后台始终禁止收录。</p>
+<label><span data-admin-i18n>默认分享图片地址（可选）</span><input type="url" name="seo.image" value="{{.SEOSettings.Image}}" maxlength="2048" placeholder="https://example.com/share.jpg"><span class="hint" data-admin-i18n>用于分享链接预览。商品有封面时优先使用商品封面。</span></label>
+<p class="hint" data-admin-i18n>关闭收录或开启维护模式时，站点地图不列出页面。正式上线请确认部署地址为公开域名。</p><div class="actions"><a class="btn sm" href="/sitemap.xml" target="_blank" rel="noopener" data-admin-i18n>查看站点地图</a><a class="btn sm" href="/robots.txt" target="_blank" rel="noopener">robots.txt</a></div>
+</div></section>
+<section class="panel"><div class="panel-head"><h2 data-admin-i18n>站点所有权验证</h2></div><div class="panel-body form">
+<label>Google Search Console<input name="seo.google" value="{{.SEOSettings.Google}}" maxlength="200" autocomplete="off"></label>
+<label>Bing Webmaster Tools<input name="seo.bing" value="{{.SEOSettings.Bing}}" maxlength="200" autocomplete="off"></label>
+<p class="hint" data-admin-i18n>仅填写验证标签的 content 值，无需粘贴 HTML。</p>
+</div></section>
+</fieldset>{{if .CanManage}}<div class="actions settings-save"><button type="submit" class="btn primary">{{template "i_check" .}} <span data-admin-i18n>保存 SEO 设置</span></button><span class="muted small" data-admin-i18n>保存后立即生效</span></div>{{end}}
+</form></main></div></body></html>{{end}}

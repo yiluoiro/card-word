@@ -151,11 +151,36 @@ func (s *Server) handleAdminChangePassword(w http.ResponseWriter, r *http.Reques
 // totpAAD binds a sealed TOTP secret to its account.
 func totpAAD(userID int64) string { return fmt.Sprintf("totp:%d", userID) }
 
+// Serialize factor transitions before reloading state: ctxUser may predate
+// another request enabling TOTP. Cross-process CAS belongs in the store.
+var factorLocks [64]sync.Mutex
+
+func (s *Server) lockFactorUser(w http.ResponseWriter, r *http.Request) (*store.User, func()) {
+	u := s.currentUser(r)
+	if u == nil {
+		redirect(w, r, "/admin/login")
+		return nil, func() {}
+	}
+	mu := &factorLocks[uint64(u.ID)%uint64(len(factorLocks))]
+	mu.Lock()
+	fresh, err := s.db.UserByID(r.Context(), u.ID)
+	if err != nil || fresh.Disabled || !store.ValidRole(fresh.Role) {
+		mu.Unlock()
+		http.Error(w, "account unavailable", http.StatusUnauthorized)
+		return nil, func() {}
+	}
+	return fresh, mu.Unlock
+}
+
 // handleTOTPStart provisions a new (not yet enabled) TOTP secret.
 func (s *Server) handleTOTPStart(w http.ResponseWriter, r *http.Request) {
-	user := s.currentUser(r)
+	user, unlock := s.lockFactorUser(w, r)
+	defer unlock()
 	if user == nil {
-		redirect(w, r, "/admin/login")
+		return
+	}
+	if user.TOTPEnabled {
+		s.renderError(w, r, http.StatusConflict, "两步验证已启用，请先使用密码和有效验证因子关闭。")
 		return
 	}
 	secret, err := cryptoutil.NewTOTPSecret()
@@ -182,9 +207,13 @@ func (s *Server) handleTOTPStart(w http.ResponseWriter, r *http.Request) {
 
 // handleTOTPEnable verifies the first code and issues recovery codes.
 func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
-	user := s.currentUser(r)
+	user, unlock := s.lockFactorUser(w, r)
+	defer unlock()
 	if user == nil {
-		redirect(w, r, "/admin/login")
+		return
+	}
+	if user.TOTPEnabled || user.TOTPSecret == "" {
+		s.renderError(w, r, http.StatusConflict, "请先开始新的两步验证设置；已启用的验证不能重复启用。")
 		return
 	}
 	if err := r.ParseForm(); err != nil {
@@ -220,9 +249,13 @@ func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
 
 // handleTOTPDisable turns 2FA off, requiring password and a valid factor.
 func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
-	user := s.currentUser(r)
+	user, unlock := s.lockFactorUser(w, r)
+	defer unlock()
 	if user == nil {
-		redirect(w, r, "/admin/login")
+		return
+	}
+	if !user.TOTPEnabled {
+		s.renderError(w, r, http.StatusConflict, "两步验证尚未启用。")
 		return
 	}
 	if err := r.ParseForm(); err != nil {

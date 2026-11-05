@@ -15,51 +15,21 @@ func nullInt64(v int64) sql.NullInt64 {
 }
 
 func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	status := strings.TrimSpace(r.URL.Query().Get("status"))
-	search := strings.TrimSpace(r.URL.Query().Get("q"))
-	const pageSize = 50
-	page := int(parseInt64(r.URL.Query().Get("page")))
-	if page < 1 {
-		page = 1
-	}
-	filter := store.OrderFilter{Status: status, Search: search}
-	total, err := s.db.CountOrders(ctx, filter)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载订单失败。")
+	rows, view, ok := s.adminList(w, r, s.db, "orders", "")
+	if !ok {
 		return
 	}
-	pages := (total + pageSize - 1) / pageSize
-	if pages < 1 {
-		pages = 1
+	var buyer *store.Customer
+	if view.Filter.CustomerID > 0 {
+		var err error
+		buyer, err = s.db.CustomerByID(r.Context(), view.Filter.CustomerID)
+		if err != nil {
+			s.renderError(w, r, http.StatusNotFound, "买家不存在。")
+			return
+		}
 	}
-	if page > pages {
-		page = pages
-	}
-	filter.Limit = pageSize
-	filter.Offset = (page - 1) * pageSize
-	orders, err := s.db.ListOrders(ctx, filter)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载订单失败。")
-		return
-	}
-	queryBase := ""
-	if status != "" {
-		queryBase += "status=" + urlEscape(status) + "&"
-	}
-	if search != "" {
-		queryBase += "q=" + urlEscape(search) + "&"
-	}
-	s.render(w, r, "admin_orders", map[string]any{
-		"Title":      "订单管理",
-		"Orders":     orders,
-		"Status":     status,
-		"Search":     search,
-		"Page":       page,
-		"TotalPages": pages,
-		"Total":      total,
-		"QueryBase":  queryBase,
-	})
+	s.render(w, r, "admin_orders", map[string]any{"Title": "订单管理", "Orders": rows, "List": view, "Buyer": buyer})
+
 }
 
 func (s *Server) handleAdminOrder(w http.ResponseWriter, r *http.Request) {
@@ -70,31 +40,43 @@ func (s *Server) handleAdminOrder(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusNotFound, "订单不存在。")
 		return
 	}
-	cards, err := s.db.OrderCards(ctx, order.ID)
-	if err != nil {
-		s.log.Warn("load order cards failed", "order", orderNo, "error", err)
+	var cards []store.CardKey
+	// Order metadata access must not bypass the admin-only card reveal route.
+	if u := s.currentUser(r); u != nil && store.RoleRank(u.Role) >= store.RoleRank(store.RoleAdmin) {
+		cards, err = s.db.OrderCards(ctx, order.ID)
+		if err != nil {
+			s.log.Warn("load order cards failed", "order", orderNo, "error", err)
+		}
 	}
 	payments, err := s.db.ListPayments(ctx, order.ID)
 	if err != nil {
 		s.log.Warn("load order payments failed", "order", orderNo, "error", err)
 	}
 	s.render(w, r, "admin_order", map[string]any{
-		"Title":    "订单 " + order.OrderNo,
-		"Order":    order,
-		"Cards":    cards,
-		"Payments": payments,
+		"OrderBack": listReturn(r.URL.Query().Get("return_to"), "/admin/orders"),
+		"Title":     "订单 " + order.OrderNo,
+		"Order":     order,
+		"Cards":     cards,
+		"Payments":  payments,
 	})
 }
 
 // handleAdminFulfill lets an operator confirm an offline payment.
 func (s *Server) handleAdminFulfill(w http.ResponseWriter, r *http.Request) {
+
 	orderNo := r.PathValue("no")
 	user := s.currentUser(r)
 	actor := "admin"
 	if user != nil {
 		actor = user.Username
 	}
-	result, err := s.db.FulfillOrder(r.Context(), orderNo, "manual", "admin:"+actor, 0, "confirmed by "+actor)
+	order, err := s.db.OrderByNo(r.Context(), orderNo)
+	if err != nil || order.PaymentDriver != "manual" {
+		flashRedirect(w, r, "/admin/orders/"+orderNo, "", "仅支持确认线下支付订单。")
+		return
+	}
+	// Confirm the recorded amount, with a stable transaction unique to this order.
+	result, err := s.db.FulfillOrder(r.Context(), orderNo, "manual", "admin:"+orderNo, order.TotalCents, "confirmed by "+actor)
 	if err != nil {
 		s.audit(r, "order.fulfill.failed", orderNo, err.Error())
 		flashRedirect(w, r, "/admin/orders/"+orderNo, "", "确认失败："+err.Error())
@@ -165,6 +147,7 @@ func (s *Server) handleAdminCloseOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminRefund(w http.ResponseWriter, r *http.Request) {
+
 	orderNo := r.PathValue("no")
 	note := "refunded by operator"
 	if err := r.ParseForm(); err == nil {
@@ -183,17 +166,12 @@ func (s *Server) handleAdminRefund(w http.ResponseWriter, r *http.Request) {
 // ---------- coupons ----------
 
 func (s *Server) handleAdminCoupons(w http.ResponseWriter, r *http.Request) {
-	coupons, err := s.db.ListCoupons(r.Context(), 200)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载优惠码失败。")
+	products, _ := s.db.ListProducts(r.Context(), store.ProductFilter{Limit: 500})
+	rows, view, ok := s.adminList(w, r, s.db, "coupons", "")
+	if !ok {
 		return
 	}
-	products, _ := s.db.ListProducts(r.Context(), store.ProductFilter{Limit: 200})
-	s.render(w, r, "admin_coupons", map[string]any{
-		"Title":    "优惠码",
-		"Coupons":  coupons,
-		"Products": products,
-	})
+	s.render(w, r, "admin_coupons", map[string]any{"Title": "优惠码", "Coupons": rows, "List": view, "Products": products})
 }
 
 func (s *Server) handleAdminCouponCreate(w http.ResponseWriter, r *http.Request) {
@@ -202,16 +180,24 @@ func (s *Server) handleAdminCouponCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	coupon := &store.Coupon{
+		ID:            parseInt64(r.FormValue("id")),
 		Code:          strings.TrimSpace(r.FormValue("code")),
 		Kind:          strings.TrimSpace(r.FormValue("kind")),
 		MaxUses:       parseInt64(r.FormValue("max_uses")),
 		MinTotalCents: parsePriceCents(r.FormValue("min_total")),
 		Active:        true,
 	}
+	if coupon.ID > 0 {
+		coupon.Active = r.FormValue("active") == "1"
+	}
 	if coupon.Kind == store.CouponPercent {
 		coupon.Value = parseInt64(r.FormValue("percent"))
 	} else {
 		coupon.Value = parsePriceCents(r.FormValue("amount"))
+	}
+	if coupon.MinTotalCents < 0 || coupon.Value < 0 {
+		s.editOrRedirect(w, r, "coupons", "金额格式不正确，请输入非负金额，最多两位小数。")
+		return
 	}
 	if productID := parseInt64(r.FormValue("product_id")); productID > 0 {
 		coupon.ProductID = nullInt64(productID)
@@ -219,20 +205,29 @@ func (s *Server) handleAdminCouponCreate(w http.ResponseWriter, r *http.Request)
 	if exp := strings.TrimSpace(r.FormValue("expires_at")); exp != "" {
 		if t, err := time.Parse("2006-01-02", exp); err == nil {
 			coupon.ExpiresAt = &t
+		} else {
+			s.editOrRedirect(w, r, "coupons", "有效日期格式不正确。")
+			return
 		}
 	}
-	if _, err := s.db.CreateCoupon(r.Context(), coupon); err != nil {
-		flashRedirect(w, r, "/admin/coupons", "", "创建失败："+err.Error())
+	var err error
+	if coupon.ID > 0 {
+		err = s.db.UpdateCoupon(r.Context(), coupon)
+	} else {
+		_, err = s.db.CreateCoupon(r.Context(), coupon)
+	}
+	if err != nil {
+		s.editOrRedirect(w, r, "coupons", "保存失败："+err.Error())
 		return
 	}
-	s.audit(r, "coupon.create", coupon.Code, "")
-	flashRedirect(w, r, "/admin/coupons", "优惠码已创建", "")
+	s.audit(r, "coupon.save", coupon.Code, "")
+	flashRedirect(w, r, "/admin/coupons", "优惠码已保存", "")
 }
 
 func (s *Server) handleAdminCouponDelete(w http.ResponseWriter, r *http.Request) {
 	id := parseInt64(r.PathValue("id"))
 	if err := s.db.DeleteCoupon(r.Context(), id); err != nil {
-		flashRedirect(w, r, "/admin/coupons", "", "删除失败。")
+		flashRedirect(w, r, "/admin/coupons", "", "删除失败；已使用的优惠码请编辑为停用，保留订单关联。")
 		return
 	}
 	s.audit(r, "coupon.delete", "", "")

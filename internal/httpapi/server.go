@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/yiluoiro/card-word/internal/config"
+
 	"github.com/yiluoiro/card-word/internal/market"
 	"github.com/yiluoiro/card-word/internal/notify"
 	"github.com/yiluoiro/card-word/internal/payment"
 	"github.com/yiluoiro/card-word/internal/plugin"
+
 	"github.com/yiluoiro/card-word/internal/store"
 	"github.com/yiluoiro/card-word/internal/version"
 )
@@ -33,11 +35,15 @@ type Server struct {
 	payments  *payment.Registry
 	notifier  *notify.Dispatcher
 
-	tmpl      *template.Template
-	mux       *http.ServeMux
-	limiter   *rateLimiter
-	authLimit *rateLimiter
-	startedAt time.Time
+	tmpl               *template.Template
+	mux                *http.ServeMux
+	limiter            *rateLimiter
+	authLimit          *rateLimiter
+	captchaLimit       *rateLimiter
+	publicCaptchaLimit *rateLimiter
+	supportLimit       *rateLimiter
+	captchas           captchaStore
+	startedAt          time.Time
 
 	settingsMu sync.RWMutex
 	settings   map[string]string
@@ -91,6 +97,9 @@ func New(d Deps) (*Server, error) {
 	}
 	s.limiter = newRateLimiter(d.Config.RateLimitRPS, d.Config.RateLimitBurst)
 	s.authLimit = newRateLimiter(0.2, 8) // ~12 login attempts per minute
+	s.publicCaptchaLimit = newRateLimiter(0.3, 20)
+	s.captchaLimit = newRateLimiter(0.2, 8)
+	s.supportLimit = newRateLimiter(0.5, 20)
 	// Machine clients get their own budget keyed by token id, so one noisy
 	// integration cannot exhaust the shared IP bucket.
 	s.apiLimiter = newRateLimiter(30, 120)
@@ -106,16 +115,32 @@ func (s *Server) Handler() http.Handler {
 	var h http.Handler = s.mux
 	h = s.csrfProtect(h)
 	h = s.bodyLimit(h)
+	h = s.customerMiddleware(h)
 	h = s.sessionMiddleware(h)
 	h = s.rateLimit(h)
 	h = s.securityHeaders(h)
 	h = s.accessLog(h)
 	h = s.recoverer(h)
 	h = s.requestID(h)
+
 	return h
 }
 
 func (s *Server) routes() {
+	s.mux.Handle("GET /admin/announcements", s.staff(store.RoleViewer, s.handleAnnouncements))
+	s.mux.Handle("POST /admin/announcements", s.staff(store.RoleAdmin, s.handleAnnouncementSave))
+	s.mux.Handle("POST /admin/announcements/{id}/delete", s.staff(store.RoleAdmin, s.handleAnnouncementDelete))
+	s.mux.Handle("GET /admin/appearance", s.staff(store.RoleOwner, s.handleAppearance))
+	s.mux.Handle("POST /admin/appearance", s.staff(store.RoleOwner, s.handleAppearanceSave))
+	s.mux.Handle("POST /admin/appearance/preview", s.staff(store.RoleOwner, s.handleAppearancePreview))
+	// Buyers have separate accounts, cookies and authorization from operators.
+	s.mux.HandleFunc("GET /account", s.customerOnly(s.handleCustomerAccount))
+	s.mux.HandleFunc("GET /account/login", s.handleCustomerAuthForm)
+	s.mux.HandleFunc("GET /account/register", s.handleCustomerAuthForm)
+	s.mux.HandleFunc("POST /account/login", s.handleCustomerAuth)
+	s.mux.HandleFunc("POST /account/register", s.handleCustomerAuth)
+	s.mux.HandleFunc("POST /account/logout", s.customerOnly(s.handleCustomerLogout))
+	s.mux.HandleFunc("POST /account/password", s.customerOnly(s.handleCustomerPassword))
 	// Public storefront.
 	s.mux.HandleFunc("GET /{$}", s.handleHome)
 	s.mux.HandleFunc("GET /p/{slug}", s.handleProduct)
@@ -123,6 +148,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /order/{no}", s.handleOrderView)
 	s.mux.HandleFunc("GET /order/{no}/status", s.handleOrderStatus)
 	s.mux.HandleFunc("GET /order/{no}/pay", s.handlePay)
+	s.mux.HandleFunc("POST /captcha", s.handleFormCaptcha)
+	s.mux.HandleFunc("POST /order/{no}/pay", s.handlePay)
+	s.mux.HandleFunc("POST /order/{no}/verify", s.handleOrderView)
 	s.mux.HandleFunc("GET /query", s.handleQueryForm)
 	s.mux.HandleFunc("POST /query", s.handleQuerySubmit)
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
@@ -138,6 +166,9 @@ func (s *Server) routes() {
 
 	// Payment webhooks (public, signature verified).
 	s.mux.HandleFunc("POST /pay/notify/{driver}", s.handlePaymentNotify)
+	s.mux.HandleFunc("GET /pay/notify/{driver}", s.handlePaymentNotify)
+	s.mux.Handle("GET /admin/payments", s.staff(store.RoleAdmin, s.handlePaymentsConfig))
+	s.mux.Handle("POST /admin/payments", s.staff(store.RoleAdmin, s.handlePaymentsSave))
 	s.mux.HandleFunc("GET /pay/return/{driver}", s.handlePaymentReturn)
 	s.mux.HandleFunc("POST /api/plugins/{uid}/notify", s.handlePluginNotify)
 
@@ -155,14 +186,22 @@ func (s *Server) routes() {
 	// only, see below.
 
 	// Admin.
+	s.mux.Handle("GET /admin/seo", s.staff(store.RoleViewer, s.handleSEOSettings))
+	s.mux.Handle("POST /admin/seo", s.staff(store.RoleAdmin, s.handleSEOSettingsSave))
+	s.mux.Handle("GET /admin/lists/{kind}/{id}", s.staff(store.RoleAdmin, s.handleListEdit))
+	s.mux.Handle("POST /admin/lists/{kind}/{id}", s.staff(store.RoleAdmin, s.handleListSave))
 	s.mux.HandleFunc("GET /admin/login", s.handleLoginForm)
 	s.mux.HandleFunc("POST /admin/login", s.handleLoginSubmit)
+	s.mux.HandleFunc("POST /admin/captcha", s.handleCaptchaRefresh)
 	s.mux.HandleFunc("GET /admin/login/2fa", s.handleLoginTwoFactorForm)
 	s.mux.HandleFunc("POST /admin/login/2fa", s.handleLoginTwoFactorSubmit)
 	s.mux.HandleFunc("POST /admin/logout", s.handleLogout)
 	s.mux.Handle("GET /admin", s.staff(store.RoleViewer, s.handleDashboard))
+	s.mux.Handle("GET /admin/customers", s.staff(store.RoleViewer, s.handleAdminCustomers))
 	s.mux.Handle("GET /admin/products", s.staff(store.RoleViewer, s.handleAdminProducts))
 	s.mux.Handle("POST /admin/products", s.staff(store.RoleAdmin, s.handleAdminProductSave))
+	s.mux.Handle("POST /admin/markdown/preview", s.staff(store.RoleAdmin, s.handleMarkdownPreview))
+	s.mux.Handle("POST /admin/markdown/image", s.staff(store.RoleAdmin, s.handleMarkdownImage))
 	s.mux.Handle("POST /admin/products/bulk", s.staff(store.RoleAdmin, s.handleAdminProductsBulk))
 	s.mux.Handle("GET /admin/products/{id}", s.staff(store.RoleViewer, s.handleAdminProductForm))
 	s.mux.Handle("POST /admin/products/{id}/delete", s.staff(store.RoleAdmin, s.handleAdminProductDelete))
@@ -171,6 +210,7 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/products/{id}/cards/bulk", s.staff(store.RoleAdmin, s.handleAdminCardsBulk))
 	s.mux.Handle("GET /admin/products/{id}/cards/export.csv", s.staff(store.RoleAdmin, s.handleAdminCardsExport))
 	s.mux.Handle("POST /admin/products/{id}/cover", s.staff(store.RoleAdmin, s.handleProductCoverUpload))
+	s.mux.Handle("POST /admin/products/{id}/variants", s.staff(store.RoleAdmin, s.handleProductVariant))
 	s.mux.Handle("POST /admin/cards/{id}/disable", s.staff(store.RoleAdmin, s.handleAdminCardDisable))
 	s.mux.Handle("POST /admin/cards/{id}/reveal", s.staff(store.RoleAdmin, s.handleAdminCardReveal))
 	s.mux.Handle("GET /admin/categories", s.admin(s.handleAdminCategories))
@@ -195,6 +235,7 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /admin/plugins/{uid}/settings", s.staff(store.RoleAdmin, s.handleAdminPluginSettings))
 	s.mux.Handle("POST /admin/market/install", s.staff(store.RoleAdmin, s.handleAdminMarketInstall))
 	s.mux.Handle("GET /admin/settings", s.staff(store.RoleViewer, s.handleAdminSettings))
+	s.mux.Handle("POST /admin/settings/icon", s.staff(store.RoleAdmin, s.handleSiteIcon))
 	s.mux.Handle("POST /admin/settings", s.staff(store.RoleAdmin, s.handleAdminSettingsSave))
 	s.mux.Handle("GET /admin/tokens", s.staff(store.RoleViewer, s.handleAdminTokens))
 	s.mux.Handle("POST /admin/tokens", s.staff(store.RoleAdmin, s.handleAdminTokenCreate))

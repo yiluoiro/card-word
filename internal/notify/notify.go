@@ -91,12 +91,19 @@ func (s *SMTP) Send(ctx context.Context, msg Message) error {
 	_ = conn.SetDeadline(deadline)
 
 	tlsCfg := &tls.Config{ServerName: s.cfg.Host, MinVersion: tls.VersionTLS12, InsecureSkipVerify: s.cfg.SkipVerify}
+	if s.cfg.UseTLS {
+		tlsConn := tls.Client(conn, tlsCfg)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			return fmt.Errorf("notify: implicit tls: %w", err)
+		}
+		conn = tlsConn
+	}
 	client, err := smtp.NewClient(conn, s.cfg.Host)
 	if err != nil {
 		return fmt.Errorf("notify: smtp handshake: %w", err)
 	}
 	defer client.Close()
-	if s.cfg.UseTLS {
+	if s.cfg.StartTLS && !s.cfg.UseTLS {
 		if err := client.StartTLS(tlsCfg); err != nil {
 			return fmt.Errorf("notify: starttls: %w", err)
 		}
@@ -131,8 +138,8 @@ func (s *SMTP) build(msg Message) string {
 		from = fmt.Sprintf("%s <%s>", s.cfg.FromName, extractAddress(s.cfg.From))
 	}
 	var sb strings.Builder
-	sb.WriteString("From: " + from + "\r\n")
-	sb.WriteString("To: " + msg.To + "\r\n")
+	sb.WriteString("From: " + sanitizeHeader(from) + "\r\n")
+	sb.WriteString("To: " + sanitizeHeader(msg.To) + "\r\n")
 	sb.WriteString("Subject: " + sanitizeHeader(msg.Subject) + "\r\n")
 	sb.WriteString("Date: " + time.Now().UTC().Format(time.RFC1123Z) + "\r\n")
 	sb.WriteString("MIME-Version: 1.0\r\n")

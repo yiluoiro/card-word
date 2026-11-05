@@ -6,7 +6,7 @@
 <main class="content narrow">
   <div class="page-head">
     <div class="titles">
-      <h1>启用两步验证</h1>
+      <h1><span data-admin-i18n>启用两步验证</span></h1>
       <div class="sub">把密钥添加到认证器（Google Authenticator、1Password、Authy 等）</div>
     </div>
   </div>
@@ -15,9 +15,9 @@
     <div class="panel-head"><h3>第一步 · 添加密钥</h3></div>
     <div class="panel-body">
       <p class="small muted">在认证器中手动输入以下密钥（区分大小写可忽略，均为大写）：</p>
-      <pre class="token" style="background:#0d1017">{{.Secret}}</pre>
+      <pre class="token">{{.Secret}}</pre>
       <p class="small muted" style="margin-top:12px">或使用以下 otpauth 链接导入：</p>
-      <pre class="inline-msg" style="word-break:break-all">{{.URI}}</pre>
+      <pre class="inline-msg authenticator-uri">{{.URI}}</pre>
     </div>
   </div>
 
@@ -31,7 +31,7 @@
         </label>
         <div class="actions">
           <button class="btn primary" type="submit">{{template "i_check" .}} 验证并启用</button>
-          <a class="btn ghost" href="/admin/account">取消</a>
+          <a class="btn ghost" href="/admin/account"><span data-admin-i18n>取消</span></a>
         </div>
       </form>
     </div>

@@ -63,6 +63,13 @@ func (s *Server) handleAdminCardsBulk(w http.ResponseWriter, r *http.Request) {
 		flashRedirect(w, r, back, "", "请先勾选卡密。")
 		return
 	}
+	for _, id := range ids {
+		card, err := s.db.CardMetadata(r.Context(), id)
+		if err != nil || card.ProductID != productID {
+			s.renderError(w, r, 422, "勾选项不属于当前商品，请刷新后重试。")
+			return
+		}
+	}
 	action := strings.TrimSpace(r.FormValue("action"))
 	switch action {
 	case "disable":
@@ -103,10 +110,22 @@ func (s *Server) handleAdminCardsExport(w http.ResponseWriter, r *http.Request) 
 		s.renderError(w, r, http.StatusNotFound, "商品不存在。")
 		return
 	}
-	cards, err := s.db.ExportCards(r.Context(), store.CardFilter{ProductID: productID, Status: status, Limit: 5000})
+	view := listView(r, "cards", "")
+	view.Filter.Size = exportRowLimit
+	view.Filter.Page = 1
+	raw, _, err := s.db.AdminList(r.Context(), "cards", view.Filter)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "导出失败。")
 		return
+	}
+	cards := raw.([]store.CardKey)
+	for i := range cards {
+		secret, e := s.db.RevealCard(r.Context(), cards[i].ID)
+		if e != nil {
+			s.renderError(w, r, 500, "解密失败。")
+			return
+		}
+		cards[i].Secret = secret
 	}
 	filename := "cards-" + product.Slug + ".csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -116,12 +135,12 @@ func (s *Server) handleAdminCardsExport(w http.ResponseWriter, r *http.Request) 
 
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
-	_ = cw.Write([]string{"ID", "卡密", "标签", "状态", "售出时间", "创建时间"})
+	_ = cw.Write([]string{"ID", "卡密", "标签", "规格", "状态", "售出时间", "创建时间"})
 	for _, c := range cards {
-		_ = cw.Write([]string{
-			strconv.FormatInt(c.ID, 10), c.Secret, c.Label, statusText(c.Status),
+		_ = cw.Write(csvTextRow([]string{
+			strconv.FormatInt(c.ID, 10), c.Secret, c.Label, c.VariantName, statusText(c.Status),
 			timeOrDash(c.SoldAt), c.CreatedAt.Local().Format("2006-01-02 15:04:05"),
-		})
+		}))
 	}
 	s.audit(r, "card.export", product.Slug, fmt.Sprintf("rows=%d status=%q", len(cards), status))
 }

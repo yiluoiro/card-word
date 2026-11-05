@@ -3,8 +3,8 @@ services:
     build:
       context: .
       args:
-        VERSION: "0.1.0"
-    image: cardword:0.1.0
+        VERSION: "0.1.0-community"
+    image: cardword-community:0.1.0
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -13,17 +13,15 @@ services:
       CARDWORD_BASE_URL: "http://127.0.0.1:8080"
       CARDWORD_ENV: "production"
       CARDWORD_LOG_LEVEL: "info"
-      # 首次启动用于创建管理员，登录后请立即在后台修改并删除该变量
-      CARDWORD_ADMIN_PASSWORD: "ChangeMe-please-123"
+      # 通过 /install 与 /data/install-token.txt 初始化管理员
       # 可选：显式指定主密钥（base64/hex 32 字节），不设置则自动生成到 /data/master.key
       # CARDWORD_MASTER_KEY: ""
       # 可选：强制插件签名并信任公钥
       # CARDWORD_PLUGIN_REQUIRE_SIGNATURE: "1"
       # CARDWORD_PLUGIN_PUBLIC_KEYS: "base64-public-key"
-      # 可选：远程商城索引
-      # CARDWORD_MARKET_URL: "https://example.com/cardword/market.json"
+      CARDWORD_MARKET_URL: "https://zinvmeng.com/market/index.json"
     volumes:
-      - ./data:/data
+      - cardword-data:/data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 30s
@@ -33,3 +31,6 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: false
+
+volumes:
+  cardword-data:

@@ -21,23 +21,25 @@ type Category struct {
 
 // Product is a sellable item backed by a pool of card keys.
 type Product struct {
-	ID           int64
-	CategoryID   sql.NullInt64
-	Name         string
-	Slug         string
-	Summary      string
-	Description  string
-	PriceCents   int64
-	Currency     string
-	Status       string
-	MinQty       int
-	MaxQty       int
-	Sort         int
-	CoverPath    string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Stock        int
-	CategoryName string
+	HasVariants    bool
+	BasePriceCents int64
+	ID             int64
+	CategoryID     sql.NullInt64
+	Name           string
+	Slug           string
+	Summary        string
+	Description    string
+	PriceCents     int64
+	Currency       string
+	Status         string
+	MinQty         int
+	MaxQty         int
+	Sort           int
+	CoverPath      string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Stock          int
+	CategoryName   string
 }
 
 // Product status values.
@@ -169,10 +171,10 @@ func (d *DB) CategoryBySlug(ctx context.Context, slug string) (*Category, error)
 // ---------- products ----------
 
 const productSelect = `
-SELECT p.id, p.category_id, p.name, p.slug, p.summary, p.description, p.price_cents, p.currency,
+SELECT p.id, p.category_id, p.name, p.slug, p.summary, p.description, COALESCE((SELECT MIN(v.price_cents) FROM product_variants v WHERE v.product_id=p.id AND v.active=1),p.price_cents), p.currency,
        p.status, p.min_qty, p.max_qty, p.sort, p.created_at, p.updated_at,
-       (SELECT COUNT(*) FROM card_keys c WHERE c.product_id = p.id AND c.status = 'available') AS stock,
-       COALESCE(cat.name, '') AS category_name, p.cover_path
+       (SELECT COUNT(*) FROM card_keys c WHERE c.product_id = p.id AND c.status = 'available' AND (NOT EXISTS(SELECT 1 FROM product_variants v WHERE v.product_id=p.id) OR EXISTS(SELECT 1 FROM product_variants v WHERE v.id=c.variant_id AND v.product_id=p.id AND v.active=1))) AS stock,
+       COALESCE(cat.name, '') AS category_name, p.cover_path, EXISTS(SELECT 1 FROM product_variants v WHERE v.product_id=p.id), p.price_cents
 FROM products p
 LEFT JOIN categories cat ON cat.id = p.category_id`
 
@@ -181,7 +183,7 @@ func scanProduct(row interface{ Scan(...any) error }) (*Product, error) {
 	var created, updated int64
 	if err := row.Scan(&p.ID, &p.CategoryID, &p.Name, &p.Slug, &p.Summary, &p.Description,
 		&p.PriceCents, &p.Currency, &p.Status, &p.MinQty, &p.MaxQty, &p.Sort, &created, &updated,
-		&p.Stock, &p.CategoryName, &p.CoverPath); err != nil {
+		&p.Stock, &p.CategoryName, &p.CoverPath, &p.HasVariants, &p.BasePriceCents); err != nil {
 		return nil, err
 	}
 	p.CreatedAt, p.UpdatedAt = unixToTime(created), unixToTime(updated)
@@ -319,6 +321,7 @@ func (d *DB) ProductBySlug(ctx context.Context, slug string) (*Product, error) {
 
 // ProductFilter narrows a product listing.
 type ProductFilter struct {
+	Stock      string
 	Status     string
 	CategoryID int64
 	Search     string
@@ -326,9 +329,8 @@ type ProductFilter struct {
 	Offset     int
 }
 
-// ListProducts returns products for the storefront or the admin table.
-func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]Product, error) {
-	q := productSelect
+// productWhere keeps counts and paginated listings on identical predicates.
+func productWhere(f ProductFilter) (string, []any) {
 	var where []string
 	var args []any
 	if f.Status != "" {
@@ -339,14 +341,38 @@ func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]Product, erro
 		where = append(where, "p.category_id = ?")
 		args = append(args, f.CategoryID)
 	}
+	stockSQL := "(SELECT COUNT(*) FROM card_keys c WHERE c.product_id=p.id AND c.status='available')"
+	switch f.Stock {
+	case "low":
+		where = append(where, stockSQL+"<=3")
+	case "empty":
+		where = append(where, stockSQL+"=0")
+	case "ready":
+		where = append(where, stockSQL+">3")
+	}
 	if f.Search != "" {
-		where = append(where, "(p.name LIKE ? OR p.slug LIKE ?)")
-		like := "%" + f.Search + "%"
+		where = append(where, "(p.name LIKE ? ESCAPE '!' OR p.slug LIKE ? ESCAPE '!')")
+		like := "%" + strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(f.Search) + "%"
 		args = append(args, like, like)
 	}
 	if len(where) > 0 {
-		q += " WHERE " + strings.Join(where, " AND ")
+		return " WHERE " + strings.Join(where, " AND "), args
 	}
+	return "", args
+}
+
+// CountProducts counts all matches, ignoring Limit and Offset.
+func (d *DB) CountProducts(ctx context.Context, f ProductFilter) (int, error) {
+	where, args := productWhere(f)
+	var total int
+	err := d.read.QueryRowContext(ctx, "SELECT COUNT(*) FROM products p"+where, args...).Scan(&total)
+	return total, wrapErr("count products", err)
+}
+
+// ListProducts returns products for the storefront or the admin table.
+func (d *DB) ListProducts(ctx context.Context, f ProductFilter) ([]Product, error) {
+	where, args := productWhere(f)
+	q := productSelect + where
 	q += " ORDER BY p.sort ASC, p.id DESC"
 	if f.Limit <= 0 || f.Limit > 500 {
 		f.Limit = 100

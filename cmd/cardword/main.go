@@ -10,12 +10,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/yiluoiro/card-word/internal/config"
-	"github.com/yiluoiro/card-word/internal/cryptoutil"
 	"github.com/yiluoiro/card-word/internal/httpapi"
 	"github.com/yiluoiro/card-word/internal/market"
 	"github.com/yiluoiro/card-word/internal/notify"
@@ -81,7 +80,7 @@ func run() error {
 	notifier := notify.NewDispatcher(cfg.OutboundTimeout, func(format string, args ...any) {
 		logger.Warn(fmt.Sprintf(format, args...))
 	})
-	marketClient := market.NewClient(market.Builtin())
+	marketClient := market.NewClient(nil)
 
 	tmpl, err := httpapi.Templates()
 	if err != nil {
@@ -104,10 +103,14 @@ func run() error {
 	}
 	// Load payment and mail configuration from the settings table.
 	httpapi.LoadIntegrations(srv, context.Background())
+	handler, err := srv.WithInstallation(srv.Handler())
+	if err != nil {
+		return fmt.Errorf("prepare installation: %w", err)
+	}
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           srv.Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -119,7 +122,13 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	go housekeeping(ctx, db, logger)
+	var background sync.WaitGroup
+	background.Add(1)
+	defer func() { stop(); background.Wait() }()
+	go func() {
+		defer background.Done()
+		housekeeping(ctx, db, logger)
+	}()
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -193,66 +202,18 @@ func bootstrapAdmin(ctx context.Context, cfg *config.Config, db *store.DB, logge
 		return nil
 	}
 	password := cfg.AdminPassword
-	generated := false
-	if password == "" {
-		password, err = cryptoutil.RandomToken(18)
-		if err != nil {
-			return err
-		}
-		generated = true
-	}
-	user, err := db.CreateUser(ctx, cfg.AdminUser, password, store.RoleOwner)
+	complete, err := db.GetSetting(ctx, "installation.completed", "")
 	if err != nil {
+		return err
+	}
+	if complete == "1" || password == "" {
+		return nil
+	}
+	if err := db.Install(ctx, store.Installation{SiteName: "Card Word", Username: cfg.AdminUser, Password: password}); err != nil {
 		return fmt.Errorf("create bootstrap admin: %w", err)
 	}
-	if err := db.Audit(ctx, "system", "auth.bootstrap", user.Username, "", "initial administrator created"); err != nil {
-		logger.Warn("audit failed during bootstrap", "error", err)
-	}
-	if generated {
-		path := filepath.Join(cfg.DataDir, "initial-admin.txt")
-		note := fmt.Sprintf("username: %s\npassword: %s\n\n请登录后立即修改密码，并删除本文件。\n", user.Username, password)
-		if err := os.WriteFile(path, []byte(note), 0o600); err != nil {
-			logger.Warn("cannot write initial credentials file", "error", err)
-		}
-		logger.Warn("generated initial administrator credentials",
-			"username", user.Username, "password_file", path)
-	}
-	// Seed a usable storefront so a fresh install is not empty.
-	if err := seed(ctx, db); err != nil {
-		logger.Warn("seed failed", "error", err)
-	}
+	logger.Info("initial administrator created from environment", "username", cfg.AdminUser)
 	return nil
-}
-
-func seed(ctx context.Context, db *store.DB) error {
-	if err := db.SetSetting(ctx, store.SettingSiteName, "Card Word"); err != nil {
-		return err
-	}
-	_ = db.SetSetting(ctx, store.SettingSiteTagline, "即时自动发卡 · 安全 · 轻量")
-	_ = db.SetSetting(ctx, store.SettingCurrency, "CNY")
-	_ = db.SetSetting(ctx, store.SettingPaymentDriver, "manual")
-
-	category, err := db.CreateCategory(ctx, "默认分类", "default", 0, true)
-	if err != nil {
-		return err
-	}
-	product, err := db.CreateProduct(ctx, store.ProductInput{
-		Name:        "示例会员卡（可删除）",
-		Slug:        "demo-card",
-		CategoryID:  category.ID,
-		Summary:     "这是一条演示商品，用于验证下单与自动发货流程。",
-		Description: "下单并确认支付后，系统会从卡密池中自动取出一条卡密并展示给买家。",
-		PriceCents:  990,
-		Currency:    "CNY",
-		Status:      store.ProductActive,
-		MinQty:      1,
-		MaxQty:      5,
-	})
-	if err != nil {
-		return err
-	}
-	_, err = db.AddCards(ctx, product.ID, []string{"DEMO-KEY-0001-AAAA", "DEMO-KEY-0002-BBBB", "DEMO-KEY-0003-CCCC"}, "seed")
-	return err
 }
 
 // housekeeping runs the periodic maintenance loop.

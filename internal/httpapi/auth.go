@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"html/template"
 	"net/http"
 	"strings"
 	"time"
@@ -13,7 +14,24 @@ import (
 
 func (s *Server) currentUser(r *http.Request) *store.User {
 	u, _ := r.Context().Value(ctxUser).(*store.User)
+	// ctxUser is exclusively for operators, never customer cookie identities.
+	if u == nil || u.Disabled || !store.ValidRole(u.Role) {
+		return nil
+	}
 	return u
+}
+
+func (s *Server) requireStaffRole(w http.ResponseWriter, r *http.Request, role string) bool {
+	u := s.currentUser(r)
+	if u == nil {
+		redirect(w, r, "/admin/login")
+		return false
+	}
+	if !store.ValidRole(role) || store.RoleRank(u.Role) < store.RoleRank(role) {
+		s.renderError(w, r, http.StatusForbidden, "当前账号没有该操作权限。")
+		return false
+	}
+	return true
 }
 
 // admin wraps a handler so only authenticated operators reach it.
@@ -43,17 +61,20 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 // renderLogin issues a fresh captcha and renders the form. Every failed attempt
 // rotates the code, so a stale answer is never reusable.
 func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, msg string) {
-	token, code, err := s.issueCaptcha()
-	if err != nil {
-		s.log.Error("captcha generation failed", "error", err)
-		s.renderError(w, r, http.StatusInternalServerError, "登录页初始化失败。")
+	s.renderLoginStatus(w, r, http.StatusOK, msg)
+}
+
+func (s *Server) renderLoginStatus(w http.ResponseWriter, r *http.Request, status int, msg string) {
+	src, ok := s.captchaImage(w, r)
+	if !ok {
 		return
 	}
-	s.setCaptchaCookie(w, token)
-	s.render(w, r, "admin_login", map[string]any{
-		"Title":   "管理员登录",
-		"Captcha": captchaSVG(code),
-		"Error":   msg,
+	s.renderStatus(w, r, status, "admin_login", map[string]any{
+		"Title":      "管理员登录",
+		"Captcha":    template.URL(src), // Generated PNG data URI, never user input.
+		"Error":      msg,
+		"Username":   strings.TrimSpace(r.PostFormValue("username")),
+		"CaptchaTTL": int(captchaTTL.Seconds()),
 	})
 }
 
@@ -70,12 +91,12 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
 	if username == "" || password == "" {
-		s.renderError(w, r, http.StatusBadRequest, "请输入用户名和密码。")
+		s.renderLoginStatus(w, r, http.StatusBadRequest, "请输入用户名和密码。")
 		return
 	}
-	if !s.verifyCaptcha(s.captchaFromRequest(r), r.FormValue("captcha")) {
+	if !s.verifyCaptcha(r, r.FormValue("captcha")) {
 		_ = s.db.Audit(r.Context(), username, "auth.login.captcha_failed", "", ip, "invalid captcha")
-		s.renderLogin(w, r, "验证码不正确，请重新输入。")
+		s.renderLoginStatus(w, r, http.StatusUnprocessableEntity, "验证码不正确或已失效，已换一张，请重新输入。")
 		return
 	}
 	s.clearCaptchaCookie(w)
@@ -105,10 +126,10 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		s.guard.fail(strings.ToLower(username))
 		_ = s.db.Audit(r.Context(), username, "auth.login.failed", "", ip, "invalid credentials")
 		s.log.Warn("failed admin login", "username", username, "ip", ip)
-		s.renderError(w, r, http.StatusUnauthorized, "用户名或密码错误。")
+		s.renderLoginStatus(w, r, http.StatusUnauthorized, "用户名或密码错误，请重试。验证码已更新。")
 		return
 	}
-	if user.Disabled {
+	if user.Disabled || !store.ValidRole(user.Role) {
 		s.audit(r, "auth.login.disabled", user.Username, "")
 		s.renderError(w, r, http.StatusForbidden, "该账号已被禁用，请联系站点所有者。")
 		return
@@ -218,7 +239,7 @@ func (s *Server) setTwoFactorCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cookieName(cookieTwoFactor),
 		Value:    token,
-		Path:     "/admin",
+		Path:     "/",
 		MaxAge:   int(store.ChallengeTTL.Seconds()),
 		HttpOnly: true,
 		Secure:   s.cfg.Secure(),
@@ -230,7 +251,7 @@ func (s *Server) clearTwoFactorCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cookieName(cookieTwoFactor),
 		Value:    "",
-		Path:     "/admin",
+		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   s.cfg.Secure(),
@@ -315,7 +336,7 @@ func (s *Server) handleLoginTwoFactorSubmit(w http.ResponseWriter, r *http.Reque
 	}
 	code := strings.TrimSpace(r.FormValue("code"))
 	user, err := s.db.UserByID(r.Context(), ch.UserID)
-	if err != nil || user.Disabled {
+	if err != nil || user.Disabled || !store.ValidRole(user.Role) || !user.TOTPEnabled {
 		_ = s.db.DeleteChallenge(r.Context(), ch.ID)
 		s.clearTwoFactorCookie(w)
 		redirect(w, r, "/admin/login")
@@ -365,7 +386,7 @@ func (s *Server) staff(minRole string, next http.HandlerFunc) http.Handler {
 			redirect(w, r, "/admin/login")
 			return
 		}
-		if store.RoleRank(user.Role) < store.RoleRank(minRole) {
+		if !store.ValidRole(minRole) || store.RoleRank(user.Role) < store.RoleRank(minRole) {
 			s.audit(r, "rbac.denied", minRole, r.URL.Path)
 			s.renderError(w, r, http.StatusForbidden, "当前账号没有该操作权限。")
 			return

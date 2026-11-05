@@ -77,8 +77,26 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status, sort);
 
+-- Buyer accounts are deliberately independent of administrative users.
+CREATE TABLE IF NOT EXISTS customers (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    created_at    INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS customer_sessions (
+    token_hash   TEXT PRIMARY KEY NOT NULL,
+    customer_id  INTEGER NOT NULL UNIQUE REFERENCES customers(id) ON DELETE CASCADE,
+    created_at   INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    expires_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_customer_sessions_expires ON customer_sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS orders (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id      INTEGER REFERENCES customers(id),
     order_no         TEXT    NOT NULL UNIQUE,
     product_id       INTEGER NOT NULL,
     product_name     TEXT    NOT NULL,
@@ -108,6 +126,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(email);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_idem ON orders(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_orders_coupon_pending ON orders(coupon_code,status,expires_at);
 
 CREATE TABLE IF NOT EXISTS card_keys (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -212,3 +231,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
+
+-- Storefront variants and announcements.
+CREATE TABLE IF NOT EXISTS product_variants (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+ name TEXT NOT NULL, price_cents INTEGER NOT NULL CHECK(price_cents>=0), active INTEGER NOT NULL DEFAULT 1,
+ sort INTEGER NOT NULL DEFAULT 0, UNIQUE(product_id,name)
+);
+CREATE TABLE IF NOT EXISTS announcements (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,body TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('draft','published','archived')),
+ audience TEXT NOT NULL CHECK(audience IN ('all','guest','user')),
+ mode TEXT NOT NULL CHECK(mode IN ('silent','popup')),
+ revision INTEGER NOT NULL DEFAULT 1,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL
+);

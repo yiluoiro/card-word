@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -115,7 +116,14 @@ func (s *Server) handleAPIProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(products))
 	for _, p := range products {
-		out = append(out, productJSON(p))
+		payload := productJSON(p)
+		variants, e := s.db.ProductVariants(r.Context(), p.ID, true)
+		if e != nil {
+			writeAPIError(w, 500, "internal", "cannot load variants")
+			return
+		}
+		payload["variants"] = variants
+		out = append(out, payload)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":   true,
@@ -151,25 +159,33 @@ func (s *Server) handleAPIProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	product, err := s.db.ProductBySlug(r.Context(), r.PathValue("slug"))
-	if err != nil {
+	if err != nil || product.Status != store.ProductActive {
 		writeAPIError(w, http.StatusNotFound, "not_found", "product not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": productJSON(*product)})
+	payload := productJSON(*product)
+	variants, e := s.db.ProductVariants(r.Context(), product.ID, true)
+	if e != nil {
+		writeAPIError(w, 500, "internal", "cannot load variants")
+		return
+	}
+	payload["variants"] = variants
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": payload})
 }
 
 func productJSON(p store.Product) map[string]any {
 	return map[string]any{
-		"id":          p.ID,
-		"name":        p.Name,
-		"slug":        p.Slug,
-		"summary":     p.Summary,
-		"price_cents": p.PriceCents,
-		"currency":    p.Currency,
-		"stock":       p.Stock,
-		"min_qty":     p.MinQty,
-		"max_qty":     p.MaxQty,
-		"status":      p.Status,
+		"id":           p.ID,
+		"name":         p.Name,
+		"slug":         p.Slug,
+		"summary":      p.Summary,
+		"price_cents":  p.PriceCents,
+		"has_variants": p.HasVariants,
+		"currency":     p.Currency,
+		"stock":        p.Stock,
+		"min_qty":      p.MinQty,
+		"max_qty":      p.MaxQty,
+		"status":       p.Status,
 	}
 }
 
@@ -178,6 +194,9 @@ func (s *Server) handleAPIOrder(w http.ResponseWriter, r *http.Request) {
 	// are only returned when the token also holds cards:read.
 	record, ok := s.requireAPIToken(w, r, "orders:read")
 	if !ok {
+		return
+	}
+	if !s.apiVerified(w, r, record.ID, "read:"+r.PathValue("no")) {
 		return
 	}
 	order, err := s.db.OrderByNo(r.Context(), r.PathValue("no"))
@@ -202,9 +221,10 @@ func (s *Server) handleAPIOrder(w http.ResponseWriter, r *http.Request) {
 
 func orderJSON(o store.Order) map[string]any {
 	return map[string]any{
-		"order_no":       o.OrderNo,
-		"product_id":     o.ProductID,
-		"product_name":   o.ProductName,
+		"order_no":     o.OrderNo,
+		"product_id":   o.ProductID,
+		"product_name": o.ProductName,
+		"variant_id":   o.VariantID, "variant_name": o.VariantName,
 		"quantity":       o.Quantity,
 		"total_cents":    o.TotalCents,
 		"currency":       o.Currency,
@@ -215,10 +235,12 @@ func orderJSON(o store.Order) map[string]any {
 		"paid_at":        o.PaidAt,
 		"delivered_at":   o.DeliveredAt,
 		"payment_driver": o.PaymentDriver,
+		"payment_method": o.PaymentMethod,
 	}
 }
 
 type apiCreateOrderRequest struct {
+	VariantID   int64  `json:"variant_id"`
 	ProductID   int64  `json:"product_id"`
 	ProductSlug string `json:"product_slug"`
 	Quantity    int    `json:"quantity"`
@@ -237,19 +259,17 @@ type apiCreateOrderResponse struct {
 }
 
 func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAPIToken(w, r, "orders:write"); !ok {
+	record, ok := s.requireAPIToken(w, r, "orders:write")
+	if !ok {
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
-	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "bad_request", "cannot read body")
+	if s.setting(store.SettingMaintenance, "0") == "1" {
+		writeAPIError(w, http.StatusServiceUnavailable, "maintenance", "store is under maintenance")
 		return
 	}
 	var req apiCreateOrderRequest
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+	body, ok := readAPIJSON(w, r, 64<<10, &req)
+	if !ok {
 		return
 	}
 	if req.ProductID == 0 && req.ProductSlug != "" {
@@ -260,21 +280,29 @@ func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
 		}
 		req.ProductID = product.ID
 	}
-	if req.Driver == "" {
-		req.Driver = s.setting(store.SettingPaymentDriver, "manual")
+	product, err := s.db.ProductByID(r.Context(), req.ProductID)
+	if err != nil || product.Status != store.ProductActive {
+		writeAPIError(w, http.StatusNotFound, "not_found", "product not found")
+		return
 	}
-	if _, ok := s.findDriver(req.Driver); !ok {
-		writeAPIError(w, http.StatusBadRequest, "bad_request", "unknown payment driver")
+	provider, method, allowed := s.checkoutPayment(product.Currency, req.Driver)
+	if !allowed {
+		writeAPIError(w, http.StatusBadRequest, "bad_request", "payment driver is unavailable")
+		return
+	}
+	if !s.apiVerified(w, r, record.ID, "create:"+cryptoutil.TokenHash(string(body))) {
 		return
 	}
 	result, err := s.db.CreateOrder(r.Context(), store.CreateOrderInput{
 		ProductID:      req.ProductID,
+		VariantID:      req.VariantID,
 		Quantity:       req.Quantity,
 		Email:          strings.TrimSpace(req.Email),
 		CouponCode:     strings.TrimSpace(req.Coupon),
-		PaymentDriver:  req.Driver,
+		PaymentDriver:  provider,
+		PaymentMethod:  method,
 		ClientIP:       s.clientIP(r),
-		IdempotencyKey: apiIdempotencyKey(r, body),
+		IdempotencyKey: "token:" + strconv.FormatInt(record.ID, 10) + ":" + apiIdempotencyKey(r, body),
 		TTL:            s.cfg.OrderTTL,
 	})
 	if err != nil {
@@ -289,14 +317,18 @@ func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	order := result.Order
-	s.hook(r.Context(), "order.created", map[string]any{
-		"order_no":    order.OrderNo,
-		"product_id":  order.ProductID,
-		"quantity":    order.Quantity,
-		"total_cents": order.TotalCents,
-		"email":       order.Email,
-	})
-	s.audit(r, "order.create.api", order.OrderNo, "via api token")
+	payURL := ""
+	if !result.Replayed {
+		payURL = s.cfg.BaseURL + "/order/" + order.OrderNo + "/pay?token=" + result.QueryToken
+		s.hook(r.Context(), "order.created", map[string]any{
+			"order_no":    order.OrderNo,
+			"product_id":  order.ProductID,
+			"quantity":    order.Quantity,
+			"total_cents": order.TotalCents,
+			"email":       order.Email,
+		})
+		s.audit(r, "order.create.api", order.OrderNo, "via api token")
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"ok": true,
 		"data": apiCreateOrderResponse{
@@ -304,7 +336,7 @@ func (s *Server) handleAPICreateOrder(w http.ResponseWriter, r *http.Request) {
 			QueryToken: result.QueryToken,
 			TotalCents: order.TotalCents,
 			Currency:   order.Currency,
-			PayURL:     s.cfg.BaseURL + "/order/" + order.OrderNo + "/pay?token=" + result.QueryToken,
+			PayURL:     payURL,
 			ExpiresAt:  order.ExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
 		},
 	})
@@ -324,6 +356,7 @@ func (s *Server) handleAPICloseOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 type apiAddCardsRequest struct {
+	VariantID int64    `json:"variant_id"`
 	ProductID int64    `json:"product_id"`
 	Secrets   []string `json:"secrets"`
 	Label     string   `json:"label"`
@@ -333,23 +366,15 @@ func (s *Server) handleAPIAddCards(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAPIToken(w, r, "cards:write"); !ok {
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, 4<<20))
-	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "bad_request", "cannot read body")
-		return
-	}
 	var req apiAddCardsRequest
-	dec := json.NewDecoder(strings.NewReader(string(body)))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+	if _, ok := readAPIJSON(w, r, 4<<20, &req); !ok {
 		return
 	}
 	if len(req.Secrets) == 0 || len(req.Secrets) > 5000 {
 		writeAPIError(w, http.StatusBadRequest, "bad_request", "secrets must contain 1-5000 entries")
 		return
 	}
-	imported, err := s.db.AddCards(r.Context(), req.ProductID, req.Secrets, req.Label)
+	imported, err := s.db.AddVariantCards(r.Context(), req.ProductID, req.VariantID, req.Secrets, req.Label)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
@@ -365,8 +390,8 @@ func (s *Server) handlePluginNotify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := r.PathValue("uid")
-	body, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
-	if err != nil {
+	body, err := io.ReadAll(io.LimitReader(r.Body, (64<<10)+1))
+	if err != nil || len(body) > 64<<10 {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -384,8 +409,37 @@ func (s *Server) handlePluginNotify(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ignored": true})
 		return
 	}
-	s.completePayment(r.Context(), cb, s.clientIP(r))
+	if err := s.completePayment(r.Context(), cb, s.clientIP(r)); err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "payment_failed", "payment processing failed")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// Read the entire permitted body, including the EOF boundary, so neither a
+// second JSON value nor a silently truncated oversized request can be accepted.
+func readAPIJSON(w http.ResponseWriter, r *http.Request, limit int64, dst any) ([]byte, bool) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
+	var tooLarge *http.MaxBytesError
+	if int64(len(body)) > limit || errors.As(err, &tooLarge) {
+		writeAPIError(w, http.StatusRequestEntityTooLarge, "body_too_large", "request body is too large")
+		return nil, false
+	}
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "bad_request", "cannot read body")
+		return nil, false
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		writeAPIError(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return nil, false
+	}
+	if err := dec.Decode(new(any)); err != io.EOF {
+		writeAPIError(w, http.StatusBadRequest, "bad_request", "expected a single JSON value")
+		return nil, false
+	}
+	return body, true
 }
 
 // apiIdempotencyKey prefers an explicit Idempotency-Key header so a robot can

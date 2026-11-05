@@ -15,6 +15,12 @@ const (
 	CouponFixed   = "fixed"
 )
 
+func pendingCouponUses(ctx context.Context, tx *sql.Tx, code string) (int64, error) {
+	var count int64
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM orders WHERE coupon_code=? AND status='pending' AND expires_at>?`, code, nowUnix()).Scan(&count)
+	return count, err
+}
+
 // Coupon is a discount code.
 type Coupon struct {
 	ID            int64
@@ -129,7 +135,7 @@ func (d *DB) ListCoupons(ctx context.Context, limit int) ([]Coupon, error) {
 
 // DeleteCoupon removes a coupon.
 func (d *DB) DeleteCoupon(ctx context.Context, id int64) error {
-	res, err := d.write.ExecContext(ctx, `DELETE FROM coupons WHERE id = ?`, id)
+	res, err := d.write.ExecContext(ctx, `DELETE FROM coupons WHERE id = ? AND used_count=0 AND NOT EXISTS(SELECT 1 FROM orders WHERE coupon_code=coupons.code)`, id)
 	if err != nil {
 		return wrapErr("delete coupon", err)
 	}
@@ -142,6 +148,9 @@ func (d *DB) DeleteCoupon(ctx context.Context, id int64) error {
 // DiscountFor validates a coupon against a cart and returns the discount in
 // cents together with the resulting total.
 func DiscountFor(c *Coupon, productID, subtotalCents int64, now time.Time) (int64, int64, error) {
+	if subtotalCents < 0 {
+		return 0, subtotalCents, errors.New("store: negative subtotal")
+	}
 	if c == nil {
 		return 0, subtotalCents, nil
 	}
@@ -163,8 +172,15 @@ func DiscountFor(c *Coupon, productID, subtotalCents int64, now time.Time) (int6
 	var discount int64
 	switch c.Kind {
 	case CouponPercent:
-		discount = subtotalCents * c.Value / 100
+		if c.Value <= 0 || c.Value > 100 {
+			return 0, subtotalCents, errors.New("store: invalid coupon percentage")
+		}
+		// Split before multiplying to avoid overflowing monetary values.
+		discount = subtotalCents/100*c.Value + subtotalCents%100*c.Value/100
 	case CouponFixed:
+		if c.Value <= 0 {
+			return 0, subtotalCents, errors.New("store: invalid fixed discount")
+		}
 		discount = c.Value
 	default:
 		return 0, subtotalCents, errors.New("store: unknown coupon kind")

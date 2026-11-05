@@ -1,0 +1,16 @@
+{{define "shop_appearance"}}{{template "head" .}}<body class="app">{{template "admin_sidebar" .}}<div class="main">{{template "admin_topbar" .}}<main class="content">{{template "flash" .}}
+  <div class="page-head"><div class="titles"><span class="overline">STORE APPEARANCE</span><h1>店铺装修</h1><p class="sub">设置模板、主色和首页文字，预览后保存发布。</p></div><a class="btn" href="/" target="_blank" rel="noopener">查看已发布店铺 ↗</a></div>
+  <form class="form appearance-form" method="post" action="/admin/appearance" data-unsaved-warning="{{if .Error}}true{{else}}false{{end}}">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <section class="panel"><div class="panel-head"><div><h2>选择模板</h2><p class="panel-sub">模板只改变店铺展示；商品、订单与后台操作不受影响。</p></div></div><div class="panel-body"><div class="template-options">
+      {{range .Styles}}<label class="template-choice"><input type="radio" name="style" value="{{.Key}}" {{if eq $.Appearance.Style .Key}}checked{{end}} required><span class="template-mini template-mini-{{.Key}}" aria-hidden="true"><span class="mini-nav"></span><span class="mini-hero"></span><span class="mini-grid"><i></i><i></i><i></i></span></span><span class="template-choice-text"><b data-admin-i18n>{{.Name}}</b><span data-admin-i18n>{{.Description}}</span></span></label>{{end}}
+    </div></div></section>
+    <div class="merchant-layout"><section class="panel"><div class="panel-head"><h2>首页文案</h2></div><div class="panel-body form">
+      <label>标题上方短句<input name="eyebrow" value="{{.Appearance.Eyebrow}}" required maxlength="40"></label>
+      <label>首页主标题<input name="headline" value="{{.Appearance.Headline}}" required maxlength="80"></label>
+      <label>商品区标题<input name="catalog_title" value="{{.Appearance.CatalogTitle}}" required maxlength="40"></label>
+      <label>商品区说明<textarea name="catalog_description" required maxlength="160" rows="3">{{.Appearance.CatalogDescription}}</textarea></label>
+      <p class="hint">店铺名称、副标题、公告与联系邮箱可在「设置」中修改。</p>
+    </div></section><section class="panel"><div class="panel-head"><h2>品牌主色</h2></div><div class="panel-body"><div class="accent-options">{{range .Accents}}<label class="accent-choice"><input type="radio" name="accent" value="{{.Key}}" {{if eq $.Appearance.Accent .Key}}checked{{end}} required><span class="accent-dot accent-{{.Key}}"></span>{{.Name}}</label>{{end}}</div><p class="hint">内置配色覆盖浅色与深色模式。预览只对当前登录的店主开放，不会发布修改。</p><div class="actions"><button class="btn" type="submit" formmethod="post" formaction="/admin/appearance/preview" formtarget="_blank" data-appearance-preview>预览效果 ↗</button><button class="btn primary" type="submit">保存并发布</button></div></div></section></div>
+  </form>
+</main></div></body></html>{{end}}

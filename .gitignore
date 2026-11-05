@@ -25,3 +25,7 @@ keys/
 coverage.out
 *.test
 tmpkeys/
+
+__pycache__/
+*.pyc
+*.log

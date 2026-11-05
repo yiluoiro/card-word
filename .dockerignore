@@ -7,3 +7,11 @@ tmpdata
 keys
 *.sig
 .env
+
+dist
+tmpkeys
+*.db
+*.db-wal
+*.db-shm
+master.key
+install-token.txt

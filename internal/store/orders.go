@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -27,7 +28,10 @@ const QueryTokenTTL = 30 * 24 * time.Hour
 
 // Order is a purchase of quantity units of one product.
 type Order struct {
+	VariantID      int64
+	VariantName    string
 	ID             int64
+	CustomerID     int64
 	OrderNo        string
 	ProductID      int64
 	ProductName    string
@@ -41,6 +45,7 @@ type Order struct {
 	Contact        string
 	Status         string
 	PaymentDriver  string
+	PaymentMethod  string
 	PaymentTxn     string
 	CouponCode     string
 	ClientIP       string
@@ -55,7 +60,7 @@ type Order struct {
 const orderSelect = `
 SELECT id, order_no, product_id, product_name, quantity, unit_price_cents, subtotal_cents,
        discount_cents, total_cents, currency, email, contact, status, payment_driver, payment_txn,
-       coupon_code, client_ip, note, created_at, expires_at, paid_at, delivered_at, closed_at
+       coupon_code, client_ip, note, created_at, expires_at, paid_at, delivered_at, closed_at, COALESCE(customer_id, 0), variant_id, variant_name, payment_method
 FROM orders`
 
 func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
@@ -65,7 +70,7 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 	if err := row.Scan(&o.ID, &o.OrderNo, &o.ProductID, &o.ProductName, &o.Quantity, &o.UnitPriceCents,
 		&o.SubtotalCents, &o.DiscountCents, &o.TotalCents, &o.Currency, &o.Email, &o.Contact, &o.Status,
 		&o.PaymentDriver, &o.PaymentTxn, &o.CouponCode, &o.ClientIP, &o.Note,
-		&created, &expires, &paid, &delivered, &closed); err != nil {
+		&created, &expires, &paid, &delivered, &closed, &o.CustomerID, &o.VariantID, &o.VariantName, &o.PaymentMethod); err != nil {
 		return nil, err
 	}
 	o.CreatedAt, o.ExpiresAt = unixToTime(created), unixToTime(expires)
@@ -75,12 +80,15 @@ func scanOrder(row interface{ Scan(...any) error }) (*Order, error) {
 
 // CreateOrderInput describes a checkout attempt.
 type CreateOrderInput struct {
+	VariantID      int64
+	CustomerID     int64
 	ProductID      int64
 	Quantity       int
 	Email          string
 	Contact        string
 	CouponCode     string
 	PaymentDriver  string
+	PaymentMethod  string
 	ClientIP       string
 	IdempotencyKey string
 	TTL            time.Duration
@@ -98,73 +106,115 @@ type CreateOrderResult struct {
 // confirmed, so an abandoned checkout never locks inventory.
 func (d *DB) CreateOrder(ctx context.Context, in CreateOrderInput) (*CreateOrderResult, error) {
 	in.Email = strings.TrimSpace(in.Email)
+	in.CouponCode = strings.ToUpper(strings.TrimSpace(in.CouponCode))
+	if in.CustomerID < 0 {
+		return nil, errors.New("store: invalid customer id")
+	}
 	if in.Quantity <= 0 {
 		return nil, errors.New("store: quantity must be positive")
 	}
 	if in.TTL <= 0 {
 		in.TTL = 15 * time.Minute
 	}
-	product, err := d.ProductByID(ctx, in.ProductID)
-	if err != nil {
-		return nil, err
-	}
-	if product.Status != ProductActive {
-		return nil, fmt.Errorf("store: product is not on sale: %w", ErrInvalidStatus)
-	}
-	if in.Quantity < product.MinQty || in.Quantity > product.MaxQty {
-		return nil, fmt.Errorf("store: quantity must be between %d and %d", product.MinQty, product.MaxQty)
-	}
-	if product.Stock < in.Quantity {
-		return nil, ErrOutOfStock
-	}
-	subtotal := product.PriceCents * int64(in.Quantity)
-	discount := int64(0)
-	couponCode := ""
-	if code := strings.TrimSpace(in.CouponCode); code != "" {
-		coupon, err := d.CouponByCode(ctx, code)
+	var result CreateOrderResult
+	err := d.tx(ctx, func(tx *sql.Tx) error {
+		// Immediate transactions serialize lookup and insertion across handles.
+		// Never expose another buyer's order on an idempotency key collision.
+		if in.IdempotencyKey != "" {
+			existing, err := scanOrder(tx.QueryRowContext(ctx, orderSelect+` WHERE idempotency_key = ? ORDER BY id DESC LIMIT 1`, in.IdempotencyKey))
+			if err == nil {
+				if existing.PaymentMethod != in.PaymentMethod || existing.VariantID != in.VariantID || existing.CustomerID != in.CustomerID || existing.ProductID != in.ProductID || existing.Quantity != in.Quantity || existing.Email != in.Email || existing.Contact != in.Contact || !strings.EqualFold(existing.CouponCode, in.CouponCode) || existing.PaymentDriver != in.PaymentDriver {
+					return ErrConflict
+				}
+				result.Order, result.Replayed = existing, true
+				return nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return wrapErr("get idempotent order", err)
+			}
+		}
+		product, err := scanProduct(tx.QueryRowContext(ctx, productSelect+` WHERE p.id = ?`, in.ProductID))
 		if err != nil {
-			return nil, err
+			return wrapErr("get product", err)
 		}
-		discount, _, err = DiscountFor(coupon, product.ID, subtotal, time.Now().UTC())
+		variantName := ""
+		var variants int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM product_variants WHERE product_id=?`, product.ID).Scan(&variants); err != nil {
+			return err
+		}
+		if variants > 0 || in.VariantID != 0 {
+			v, err := scanVariant(tx.QueryRowContext(ctx, variantSelect+` WHERE v.id=? AND v.product_id=? AND v.active=1`, in.VariantID, product.ID))
+			if err != nil {
+				return fmt.Errorf("规格不存在或已停用: %w", ErrInvalidStatus)
+			}
+			product.PriceCents = v.PriceCents
+			product.Stock = v.Stock
+			variantName = v.Name
+		} else {
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM card_keys WHERE product_id=? AND variant_id=0 AND status='available'`, product.ID).Scan(&product.Stock); err != nil {
+				return err
+			}
+		}
+		if product.Status != ProductActive {
+			return fmt.Errorf("store: product is not on sale: %w", ErrInvalidStatus)
+		}
+		if in.Quantity < product.MinQty || in.Quantity > product.MaxQty {
+			return fmt.Errorf("store: quantity must be between %d and %d", product.MinQty, product.MaxQty)
+		}
+		if product.Stock < in.Quantity {
+			return ErrOutOfStock
+		}
+		if product.PriceCents < 0 || product.PriceCents > math.MaxInt64/int64(in.Quantity) {
+			return errors.New("store: order amount overflows")
+		}
+		subtotal := product.PriceCents * int64(in.Quantity)
+		discount := int64(0)
+		couponCode := ""
+		if in.CouponCode != "" {
+			coupon, err := scanCoupon(tx.QueryRowContext(ctx, `SELECT id, code, kind, value, max_uses, used_count, min_total_cents, product_id, active, expires_at, created_at FROM coupons WHERE code = ?`, in.CouponCode))
+			if err != nil {
+				return err
+			}
+			// A pending, unexpired order reserves one use. The write transaction
+			// serializes this check with concurrent checkouts and payment capture.
+			if coupon.MaxUses > 0 {
+				reserved, err := pendingCouponUses(ctx, tx, coupon.Code)
+				if err != nil {
+					return err
+				}
+				if coupon.UsedCount >= coupon.MaxUses || reserved >= coupon.MaxUses-coupon.UsedCount {
+					return errors.New("优惠码次数已用完或已被待付款订单占用，请稍后重试。")
+				}
+			}
+			discount, _, err = DiscountFor(coupon, product.ID, subtotal, time.Now().UTC())
+			if err != nil {
+				return err
+			}
+			couponCode = coupon.Code
+		}
+		total := subtotal - discount
+		queryToken, err := cryptoutil.RandomToken(24)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		couponCode = coupon.Code
-	}
-	total := subtotal - discount
-	if total < 0 {
-		total = 0
-	}
-
-	if in.IdempotencyKey != "" {
-		if existing, err := d.orderByIdempotency(ctx, in.IdempotencyKey); err == nil {
-			return &CreateOrderResult{Order: existing, Replayed: true}, nil
-		} else if !errors.Is(err, ErrNotFound) {
-			return nil, err
+		now := time.Now().UTC()
+		orderNo, err := newOrderNo(now)
+		if err != nil {
+			return err
 		}
-	}
-
-	queryToken, err := cryptoutil.RandomToken(24)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now().UTC()
-	orderNo, err := newOrderNo(now)
-	if err != nil {
-		return nil, err
-	}
-
-	var created *Order
-	err = d.tx(ctx, func(tx *sql.Tx) error {
+		var customerID any
+		if in.CustomerID > 0 {
+			customerID = in.CustomerID
+		}
 		res, err := tx.ExecContext(ctx,
 			`INSERT INTO orders (order_no, product_id, product_name, quantity, unit_price_cents, subtotal_cents,
 				discount_cents, total_cents, currency, email, contact, status, payment_driver, coupon_code,
-				query_token_hash, idempotency_key, client_ip, created_at, expires_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				query_token_hash, idempotency_key, client_ip, created_at, expires_at, customer_id, variant_id, variant_name, payment_method)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			orderNo, product.ID, product.Name, in.Quantity, product.PriceCents, subtotal,
 			discount, total, product.Currency, in.Email, in.Contact, OrderPending, in.PaymentDriver,
 			couponCode, cryptoutil.TokenHash(queryToken), in.IdempotencyKey, in.ClientIP,
-			now.Unix(), now.Add(in.TTL).Unix())
+			now.Unix(), now.Add(in.TTL).Unix(), customerID, in.VariantID, variantName, in.PaymentMethod)
 		if err != nil {
 			return wrapErr("insert order", err)
 		}
@@ -173,13 +223,13 @@ func (d *DB) CreateOrder(ctx context.Context, in CreateOrderInput) (*CreateOrder
 		if err != nil {
 			return wrapErr("reload order", err)
 		}
-		created = o
+		result.Order, result.QueryToken = o, queryToken
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &CreateOrderResult{Order: created, QueryToken: queryToken}, nil
+	return &result, nil
 }
 
 func (d *DB) orderByIdempotency(ctx context.Context, key string) (*Order, error) {
@@ -282,24 +332,32 @@ func (d *DB) CountOrders(ctx context.Context, f OrderFilter) (int, error) {
 
 // DayStat is one bucket of the sales trend chart.
 type DayStat struct {
-	Date         string
-	Orders       int64
-	RevenueCents int64
+	Date          string
+	Orders        int64
+	RevenueCents  int64
+	PendingOrders int64
+	PaidOrders    int64
 }
 
 // DailyStats aggregates paid orders per day for the last n days, oldest first.
 func (d *DB) DailyStats(ctx context.Context, days int) ([]DayStat, error) {
+	return d.DailyStatsCurrency(ctx, days, "")
+}
+
+func (d *DB) DailyStatsCurrency(ctx context.Context, days int, currency string) ([]DayStat, error) {
 	if days <= 0 || days > 90 {
 		days = 7
 	}
 	rows, err := d.read.QueryContext(ctx, `
 		SELECT strftime('%Y-%m-%d', created_at, 'unixepoch') AS day,
 		       COUNT(*),
-		       COALESCE(SUM(CASE WHEN status IN ('paid','delivered') THEN total_cents ELSE 0 END), 0)
+		       COALESCE(SUM(CASE WHEN status IN ('paid','delivered') THEN total_cents ELSE 0 END), 0),
+ COALESCE(SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END),0),
+ COALESCE(SUM(CASE WHEN status IN ('paid','delivered') THEN 1 ELSE 0 END),0)
 		FROM orders
-		WHERE created_at >= ?
+		WHERE created_at >= ? AND (?='' OR currency=?)
 		GROUP BY day ORDER BY day ASC`,
-		time.Now().UTC().AddDate(0, 0, -days+1).Truncate(24*time.Hour).Unix())
+		time.Now().UTC().AddDate(0, 0, -days+1).Truncate(24*time.Hour).Unix(), currency, currency)
 	if err != nil {
 		return nil, wrapErr("daily stats", err)
 	}
@@ -307,7 +365,7 @@ func (d *DB) DailyStats(ctx context.Context, days int) ([]DayStat, error) {
 	byDay := map[string]DayStat{}
 	for rows.Next() {
 		var s DayStat
-		if err := rows.Scan(&s.Date, &s.Orders, &s.RevenueCents); err != nil {
+		if err := rows.Scan(&s.Date, &s.Orders, &s.RevenueCents, &s.PendingOrders, &s.PaidOrders); err != nil {
 			return nil, wrapErr("scan daily stats", err)
 		}
 		byDay[s.Date] = s
@@ -339,6 +397,10 @@ type OrderStats struct {
 
 // Stats computes dashboard counters.
 func (d *DB) Stats(ctx context.Context) (*OrderStats, error) {
+	return d.StatsCurrency(ctx, "")
+}
+
+func (d *DB) StatsCurrency(ctx context.Context, currency string) (*OrderStats, error) {
 	var s OrderStats
 	err := d.read.QueryRowContext(ctx, `
 		SELECT
@@ -348,7 +410,7 @@ func (d *DB) Stats(ctx context.Context) (*OrderStats, error) {
 			COALESCE(SUM(CASE WHEN status IN ('paid','delivered') THEN total_cents ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN created_at >= ? AND status IN ('paid','delivered') THEN total_cents ELSE 0 END), 0)
-		FROM orders`, startOfTodayUnix(), startOfTodayUnix()).
+		FROM orders WHERE (?='' OR currency=?)`, startOfTodayUnix(), startOfTodayUnix(), currency, currency).
 		Scan(&s.TotalOrders, &s.PaidOrders, &s.PendingOrders, &s.RevenueCents, &s.TodayOrders, &s.TodayRevenue)
 	return &s, wrapErr("order stats", err)
 }
@@ -387,16 +449,22 @@ func (d *DB) CloseOrder(ctx context.Context, orderNo string) error {
 // MarkRefunded flags a paid order as refunded without touching the cards: an
 // operator decides separately whether the keys stay valid.
 func (d *DB) MarkRefunded(ctx context.Context, orderNo, note string) error {
-	res, err := d.write.ExecContext(ctx,
-		`UPDATE orders SET status = 'refunded', note = ? WHERE order_no = ? AND status IN ('paid','delivered')`,
-		note, orderNo)
-	if err != nil {
-		return wrapErr("refund order", err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrInvalidStatus
-	}
-	return nil
+	return d.tx(ctx, func(tx *sql.Tx) error {
+		var id int64
+		if err := tx.QueryRowContext(ctx, `SELECT id FROM orders WHERE order_no=?`, orderNo).Scan(&id); err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx,
+			`UPDATE orders SET status = 'refunded', note = ? WHERE order_no = ? AND status IN ('paid','delivered')`,
+			note, orderNo)
+		if err != nil {
+			return wrapErr("refund order", err)
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrInvalidStatus
+		}
+		return nil
+	})
 }
 
 // SetOrderNote stores an operator note.
@@ -432,22 +500,34 @@ func (d *DB) FulfillOrder(ctx context.Context, orderNo, driver, txnID string, am
 		if err != nil {
 			return wrapErr("load order", err)
 		}
-		if order.Status == OrderDelivered {
+		// Validate duplicate callbacks too; zero and negative payments must not
+		// bypass amount checking.
+		if amountCents < 0 || amountCents != order.TotalCents {
+			return fmt.Errorf("store: amount mismatch: %w", ErrInvalidStatus)
+		}
+		if strings.TrimSpace(driver) == "" || (order.PaymentDriver != "" && order.PaymentDriver != driver) {
+			return fmt.Errorf("store: payment driver mismatch: %w", ErrInvalidStatus)
+		}
+		if order.Status == OrderDelivered || order.Status == OrderPaid {
+			if order.PaymentDriver != driver || order.PaymentTxn != txnID {
+				return ErrConflict
+			}
 			result.Order = order
 			result.AlreadyDone = true
+			result.ShortStock = order.Status == OrderPaid
 			return nil
 		}
-		if order.Status == OrderPending || order.Status == OrderPaid {
+		if order.Status == OrderPending {
 			// continue
 		} else if order.Status == OrderClosed {
 			return fmt.Errorf("store: order %s is closed, payment needs manual review: %w", orderNo, ErrInvalidStatus)
 		} else {
 			return fmt.Errorf("store: order %s status %s cannot be fulfilled: %w", orderNo, order.Status, ErrInvalidStatus)
 		}
-		if amountCents > 0 && amountCents != order.TotalCents {
-			return fmt.Errorf("store: amount mismatch for %s: paid %d want %d: %w", orderNo, amountCents, order.TotalCents, ErrInvalidStatus)
-		}
 		now := nowUnix()
+		if order.ExpiresAt.Unix() <= now {
+			return fmt.Errorf("store: expired order needs manual review: %w", ErrInvalidStatus)
+		}
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO payments (order_id, driver, txn_id, amount_cents, status, raw, created_at)
 			 VALUES (?, ?, ?, ?, 'captured', ?, ?)`,
@@ -472,10 +552,16 @@ func (d *DB) FulfillOrder(ctx context.Context, orderNo, driver, txnID string, am
 			}
 			return wrapErr("insert payment", err)
 		}
+		// Count coupon use at capture, even when stock is short.
+		if order.CouponCode != "" {
+			if _, err := tx.ExecContext(ctx, `UPDATE coupons SET used_count = used_count + 1 WHERE code = ?`, order.CouponCode); err != nil {
+				return wrapErr("consume coupon", err)
+			}
+		}
 
 		rows, err := tx.QueryContext(ctx,
-			`SELECT id, secret FROM card_keys WHERE product_id = ? AND status = 'available' ORDER BY id LIMIT ?`,
-			order.ProductID, order.Quantity)
+			`SELECT id, secret FROM card_keys WHERE product_id = ? AND variant_id = ? AND status = 'available' ORDER BY id LIMIT ?`,
+			order.ProductID, order.VariantID, order.Quantity)
 		if err != nil {
 			return wrapErr("select stock", err)
 		}
@@ -545,11 +631,6 @@ func (d *DB) FulfillOrder(ctx context.Context, orderNo, driver, txnID string, am
 			driver, txnID, now, now, order.ID); err != nil {
 			return wrapErr("mark delivered", err)
 		}
-		if order.CouponCode != "" {
-			if _, err := tx.ExecContext(ctx, `UPDATE coupons SET used_count = used_count + 1 WHERE code = ?`, order.CouponCode); err != nil {
-				return wrapErr("consume coupon", err)
-			}
-		}
 		updated, err := scanOrder(tx.QueryRowContext(ctx, orderSelect+` WHERE id = ?`, order.ID))
 		if err != nil {
 			return wrapErr("reload order", err)
@@ -566,18 +647,18 @@ func (d *DB) FulfillOrder(ctx context.Context, orderNo, driver, txnID string, am
 
 // RetryDelivery issues cards for an order that was paid but short on stock.
 func (d *DB) RetryDelivery(ctx context.Context, orderNo string) (*FulfillResult, error) {
-	order, err := d.OrderByNo(ctx, orderNo)
-	if err != nil {
-		return nil, err
-	}
-	if order.Status != OrderPaid {
-		return nil, ErrInvalidStatus
-	}
 	var result FulfillResult
-	err = d.tx(ctx, func(tx *sql.Tx) error {
+	err := d.tx(ctx, func(tx *sql.Tx) error {
+		order, err := scanOrder(tx.QueryRowContext(ctx, orderSelect+` WHERE order_no = ?`, orderNo))
+		if err != nil {
+			return wrapErr("load retry order", err)
+		}
+		if order.Status != OrderPaid {
+			return ErrInvalidStatus
+		}
 		rows, err := tx.QueryContext(ctx,
-			`SELECT id, secret FROM card_keys WHERE product_id = ? AND status = 'available' ORDER BY id LIMIT ?`,
-			order.ProductID, order.Quantity)
+			`SELECT id, secret FROM card_keys WHERE product_id = ? AND variant_id = ? AND status = 'available' ORDER BY id LIMIT ?`,
+			order.ProductID, order.VariantID, order.Quantity)
 		if err != nil {
 			return wrapErr("select stock", err)
 		}
@@ -594,15 +675,22 @@ func (d *DB) RetryDelivery(ctx context.Context, orderNo string) (*FulfillResult,
 			secrets[id] = sealed
 		}
 		rows.Close()
+		if err := rows.Err(); err != nil {
+			return wrapErr("select retry stock", err)
+		}
 		if len(ids) < order.Quantity {
 			return ErrOutOfStock
 		}
 		now := nowUnix()
 		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-		if _, err := tx.ExecContext(ctx,
+		res, err := tx.ExecContext(ctx,
 			`UPDATE card_keys SET status = 'sold', order_id = ?, sold_at = ? WHERE id IN (`+placeholders+`) AND status = 'available'`,
-			append([]any{order.ID, now}, toAny(ids)...)...); err != nil {
+			append([]any{order.ID, now}, toAny(ids)...)...)
+		if err != nil {
 			return wrapErr("mark cards sold", err)
+		}
+		if n, err := res.RowsAffected(); err != nil || n != int64(len(ids)) {
+			return ErrOutOfStock
 		}
 		for _, id := range ids {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO order_cards (order_id, card_id) VALUES (?, ?)`, order.ID, id); err != nil {
@@ -670,4 +758,22 @@ func (d *DB) ListPayments(ctx context.Context, orderID int64) ([]PaymentRecord, 
 		out = append(out, p)
 	}
 	return out, wrapErr("list payments", rows.Err())
+}
+
+// OrderCurrencies returns currency choices without combining unlike monetary units.
+func (d *DB) OrderCurrencies(ctx context.Context) ([]string, error) {
+	rows, err := d.read.QueryContext(ctx, "SELECT DISTINCT currency FROM orders ORDER BY currency")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var currency string
+		if err := rows.Scan(&currency); err != nil {
+			return nil, err
+		}
+		out = append(out, currency)
+	}
+	return out, rows.Err()
 }

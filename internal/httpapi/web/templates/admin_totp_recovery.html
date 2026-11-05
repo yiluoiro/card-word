@@ -6,7 +6,7 @@
 <main class="content narrow">
   <div class="page-head">
     <div class="titles">
-      <h1>恢复码</h1>
+      <h1><span data-admin-i18n>恢复码</span></h1>
       <div class="sub">两步验证已启用，请立即保存这些一次性恢复码</div>
     </div>
   </div>
@@ -19,10 +19,10 @@
   <div class="panel">
     <div class="panel-head">
       <h3>10 个恢复码</h3>
-      <div class="actions"><button class="btn sm" type="button" data-copy-all="#codes">{{template "i_copy" .}} 复制全部</button></div>
+      <div class="actions"><button class="btn sm" type="button" data-copy-all="#codes">{{template "i_copy" .}} <span data-admin-i18n>复制全部</span></button></div>
     </div>
     <div class="panel-body">
-      <ul class="keys" id="codes">
+      <ul class="keys recovery-codes" id="codes">
         {{range .Codes}}<li><code>{{.}}</code></li>{{end}}
       </ul>
       <p class="small muted">建议存放在密码管理器或离线打印件中，不要放在本机明文文件里。</p>

@@ -5,6 +5,8 @@ package market
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,7 +50,7 @@ type Client struct {
 // NewClient builds a marketplace client.
 func NewClient(builtin []Entry) *Client {
 	return &Client{
-		HTTP:    &http.Client{Timeout: 10 * time.Second},
+		HTTP:    &http.Client{Timeout: 10 * time.Second, Transport: marketTransport()},
 		Builtin: builtin,
 	}
 }
@@ -96,7 +98,7 @@ func (c *Client) fetch(ctx context.Context, url string) ([]Entry, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("market: fetch index: %w", err)
 	}
@@ -117,6 +119,13 @@ func (c *Client) fetch(ctx context.Context, url string) ([]Entry, error) {
 
 // Download fetches a package and enforces the advertised digest.
 func (c *Client) Download(ctx context.Context, e Entry, maxBytes int64) ([]byte, error) {
+	if maxBytes <= 0 || maxBytes > 8<<20 {
+		return nil, errors.New("market: invalid package size limit")
+	}
+	want, err := hex.DecodeString(e.SHA256)
+	if err != nil || len(want) != sha256.Size {
+		return nil, errors.New("market: valid package sha256 required")
+	}
 	if e.DownloadURL == "" {
 		return nil, errors.New("market: entry has no download url")
 	}
@@ -127,7 +136,7 @@ func (c *Client) Download(ctx context.Context, e Entry, maxBytes int64) ([]byte,
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("market: download: %w", err)
 	}
@@ -141,6 +150,10 @@ func (c *Client) Download(ctx context.Context, e Entry, maxBytes int64) ([]byte,
 	}
 	if int64(len(data)) > maxBytes {
 		return nil, errors.New("market: package exceeds size limit")
+	}
+	sum := sha256.Sum256(data)
+	if !strings.EqualFold(hex.EncodeToString(sum[:]), e.SHA256) {
+		return nil, errors.New("market: package sha256 mismatch")
 	}
 	return data, nil
 }

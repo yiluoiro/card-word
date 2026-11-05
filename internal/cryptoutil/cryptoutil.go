@@ -104,6 +104,9 @@ func HashPassword(password string) (string, error) {
 // VerifyPassword compares a plaintext password with a stored argon2id hash
 // in constant time.
 func VerifyPassword(encoded, password string) (bool, error) {
+	if len(encoded) > 1024 || len(password) > 1024 {
+		return false, ErrInvalidHash
+	}
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return false, ErrInvalidHash
@@ -121,6 +124,10 @@ func VerifyPassword(encoded, password string) (bool, error) {
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &timeCost, &threads); err != nil {
 		return false, ErrInvalidHash
 	}
+	// Corrupt/imported hashes must not panic or allocate unbounded memory.
+	if memory < 8 || memory > 256*1024 || timeCost < 1 || timeCost > 10 || threads < 1 || threads > 16 {
+		return false, ErrInvalidHash
+	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
 		return false, ErrInvalidHash
@@ -129,7 +136,7 @@ func VerifyPassword(encoded, password string) (bool, error) {
 	if err != nil {
 		return false, ErrInvalidHash
 	}
-	if len(want) == 0 {
+	if len(salt) < 8 || len(salt) > 64 || len(want) < 16 || len(want) > 64 {
 		return false, ErrInvalidHash
 	}
 	got := argon2.IDKey([]byte(password), salt, timeCost, memory, threads, uint32(len(want)))

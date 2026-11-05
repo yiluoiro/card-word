@@ -1,0 +1,15 @@
+{{define "admin_customers"}}{{template "head" .}}
+<body class="app">{{template "admin_sidebar" .}}<div class="main">{{template "admin_topbar" .}}
+<main class="content">{{template "flash" .}}
+<div class="page-head"><div class="titles"><span class="overline"><span data-admin-i18n>CUSTOMERS / 买家服务</span></span><h1><span data-admin-i18n>买家管理</span></h1><div class="sub"><span data-admin-i18n>查看本店注册买家的下单情况，快速定位历史订单。游客订单可在订单页按邮箱查询。</span></div></div><a class="btn sm" href="/admin/orders"><span data-admin-i18n>查询订单</span> {{template "i_arrow_right" .}}</a></div>
+{{template "admin_filter" .List}}
+<div class="panel"><div class="panel-body flush"><div class="table-wrap"><table class="table stack">
+<thead><tr><th><span data-admin-i18n>买家账号</span></th><th><span data-admin-i18n>注册时间</span></th><th class="num"><span data-admin-i18n>全部订单</span></th><th class="num"><span data-admin-i18n>已支付订单</span></th><th><span data-admin-i18n>操作</span></th></tr></thead>
+<tbody>{{range .Customers}}<tr>
+<td data-label="买家账号" data-admin-i18n-attrs="data-label"><span class="primary-cell">{{.Username}}</span><div class="secondary-cell"><span data-admin-i18n>编号</span> {{.ID}}</div></td>
+<td data-label="注册时间" data-admin-i18n-attrs="data-label">{{datetime .CreatedAt}}</td><td class="num" data-label="全部订单" data-admin-i18n-attrs="data-label">{{.Orders}}</td><td class="num" data-label="已支付订单" data-admin-i18n-attrs="data-label">{{.PaidOrders}}</td>
+<td data-label="操作" data-admin-i18n-attrs="data-label"><a class="btn sm" href="/admin/orders?customer_id={{.ID}}"><span data-admin-i18n>查看关联订单</span></a></td>
+</tr>{{else}}<tr><td colspan="5" class="muted"><span data-admin-i18n>没有符合条件的买家，可调整筛选或重置条件。</span></td></tr>{{end}}</tbody>
+</table></div></div></div>{{template "list_pager" .List.Pagination}}
+<p class="small muted"><span data-admin-i18n>已支付订单包含待补发和已发货订单，不含已退款订单。买家账号由用户注册，不在后台直接创建或删除。</span></p>
+</main></div></body></html>{{end}}

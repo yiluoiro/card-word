@@ -2,7 +2,7 @@ package httpapi_test
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -26,11 +26,13 @@ import (
 )
 
 type harness struct {
-	t      *testing.T
-	server *httptest.Server
-	client *http.Client
-	db     *store.DB
-	cfg    *config.Config
+	app      *httpapi.Server
+	payments *payment.Registry
+	t        *testing.T
+	server   *httptest.Server
+	client   *http.Client
+	db       *store.DB
+	cfg      *config.Config
 }
 
 func newHarness(t *testing.T) *harness {
@@ -80,6 +82,7 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatalf("templates: %v", err)
 	}
+	registry := payment.NewRegistry()
 	srv, err := httpapi.New(httpapi.Deps{
 		Config:    cfg,
 		DB:        db,
@@ -87,7 +90,7 @@ func newHarness(t *testing.T) *harness {
 		Plugins:   host,
 		Installer: installer,
 		Market:    market.NewClient(market.Builtin()),
-		Payments:  payment.NewRegistry(),
+		Payments:  registry,
 		Notifier:  notify.NewDispatcher(2*time.Second, nil),
 		Templates: tmpl,
 	})
@@ -108,14 +111,14 @@ func newHarness(t *testing.T) *harness {
 			return http.ErrUseLastResponse
 		},
 	}
-	return &harness{t: t, server: ts, client: client, db: db, cfg: cfg}
+	return &harness{t: t, app: srv, payments: registry, server: ts, client: client, db: db, cfg: cfg}
 }
 
 func (h *harness) csrf() string {
 	h.t.Helper()
 	base, _ := url.Parse(h.server.URL + "/admin/login")
 	for _, c := range h.client.Jar.Cookies(base) {
-		if c.Name == "cw_csrf" {
+		if c.Name == "cw_csrf" || c.Name == "__Host-cw_csrf" {
 			return c.Value
 		}
 	}
@@ -133,11 +136,44 @@ func (h *harness) get(path string) (*http.Response, string) {
 	return resp, string(body)
 }
 
+// Solve through the public refresh endpoint; the answer hook exists only in tests.
+func (h *harness) solved(scope string, form url.Values) url.Values {
+	h.t.Helper()
+	if h.csrf() == "" {
+		h.get("/")
+	}
+	resp, err := h.client.PostForm(h.server.URL+"/captcha", url.Values{"scope": {scope}, "csrf": {h.csrf()}})
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var c struct{ ID string }
+	if err := json.NewDecoder(resp.Body).Decode(&c); err != nil || c.ID == "" {
+		h.t.Fatalf("cannot get %s challenge: %d", scope, resp.StatusCode)
+	}
+	out := url.Values{}
+	for k, vs := range form {
+		out[k] = vs
+	}
+	out.Set("captcha_id", c.ID)
+	out.Set("captcha", httpapi.CaptchaAnswerForTest(h.app, c.ID))
+	return out
+}
+func (h *harness) solveForForm(path string, values url.Values) url.Values {
+	switch path {
+	case "/checkout":
+		return h.solved("checkout:"+values.Get("product_id"), values)
+	case "/account/login", "/account/register":
+		return h.solved(path[1:], values)
+	}
+	return values
+}
 func (h *harness) postForm(path string, values url.Values) *http.Response {
 	h.t.Helper()
 	if values == nil {
 		values = url.Values{}
 	}
+	values = h.solveForForm(path, values)
 	if values.Get("csrf") == "" {
 		values.Set("csrf", h.csrf())
 	}
@@ -292,9 +328,10 @@ func TestStorefrontAndAdminFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("anonymous order request: %v", err)
 	}
+	raw, _ := io.ReadAll(anonResp.Body)
 	anonResp.Body.Close()
-	if anonResp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403 for wrong token, got %d", anonResp.StatusCode)
+	if anonResp.StatusCode != 200 || !strings.Contains(string(raw), "captcha_id") || strings.Contains(string(raw), "E2E-KEY") {
+		t.Fatalf("expected a challenge without order data, got %d", anonResp.StatusCode)
 	}
 
 	// Order status API.
@@ -379,25 +416,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// captcha reads the expected answer from the signed captcha cookie. The cookie
-// is HttpOnly, which only hides it from page scripts - the test owns the jar.
+// captcha installs a known answer using a hook compiled only into tests.
 func (h *harness) captcha() string {
 	base, _ := url.Parse(h.server.URL + "/admin/login")
 	for _, c := range h.client.Jar.Cookies(base) {
-		if c.Name != "cw_cap" {
-			continue
-		}
-		parts := strings.SplitN(c.Value, ".", 2)
-		if len(parts) != 2 {
-			return ""
-		}
-		raw, err := base64.RawURLEncoding.DecodeString(parts[0])
-		if err != nil {
-			return ""
-		}
-		fields := strings.SplitN(string(raw), "|", 2)
-		if len(fields) == 2 {
-			return fields[0]
+		if c.Name == "cw_cap" {
+			return httpapi.CaptchaAnswerForTest(h.app, c.Value)
 		}
 	}
 	return ""

@@ -7,84 +7,86 @@
   {{template "flash" .}}
   <div class="page-head">
     <div class="titles">
-      <h1>团队与权限</h1>
-      <div class="sub">所有者可管理账号；管理员可运营；只读账号仅能查看数据</div>
+      <h1><span data-admin-i18n>团队与权限</span></h1>
+      <div class="sub"><span data-admin-i18n>所有者可管理账号；管理员可运营；只读账号仅能查看数据</span></div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>新增成员</h3><span class="panel-sub">初始密码至少 12 位，通过安全渠道告知</span></div>
+  <details class="panel admin-create" {{if .Error}}open{{end}}>
+    <summary class="panel-head"><h3><span data-admin-i18n>新增成员</span></h3><span class="panel-sub"><span data-admin-i18n>初始密码至少 12 位，通过安全渠道告知</span></span><span class="create-toggle">{{template "i_plus" .}} <span class="create-expand"><span data-admin-i18n>展开填写</span></span><span class="create-collapse"><span data-admin-i18n>收起表单</span></span></span></summary>
     <div class="panel-body">
       <form method="post" action="/admin/users" class="row-form">
-        <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>用户名<input type="text" name="username" required autocomplete="off"></label>
-        <label>初始密码<input type="password" name="password" minlength="12" required autocomplete="new-password"></label>
-        <label>角色
+        <input type="hidden" name="csrf" value="{{.CSRF}}">{{if .ListReturn}}<input type="hidden" name="list_return" value="{{.ListReturn}}">{{end}}
+        <label><span data-admin-i18n>用户名</span><input type="text" name="username" required autocomplete="off"></label>
+        <label><span data-admin-i18n>初始密码</span><input type="password" name="password" minlength="12" required autocomplete="new-password"></label>
+        <label><span data-admin-i18n>角色</span>
           <select name="role">
-            <option value="admin">管理员</option>
-            <option value="viewer">只读</option>
-            <option value="owner">所有者</option>
+            <option value="admin" data-admin-i18n-option>管理员</option>
+            <option value="viewer" data-admin-i18n-option>只读</option>
+            <option value="owner" data-admin-i18n-option>所有者</option>
           </select>
         </label>
-        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} 创建</button></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn primary" type="submit">{{template "i_plus" .}} <span data-admin-i18n>创建</span></button></div>
       </form>
     </div>
-  </div>
+  </details>
 
   <div class="panel">
-    <div class="panel-body flush">
+    {{template "admin_filter" .List}}
+<div class="panel-body flush">
       <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>账号</th><th>角色</th><th>状态</th><th>最近登录</th><th class="num">操作</th></tr></thead>
+        <table class="table stack">
+          <thead><tr><th><span data-admin-i18n>账号</span></th><th><span data-admin-i18n>角色</span></th><th><span data-admin-i18n>状态</span></th><th><span data-admin-i18n>最近登录</span></th><th class="num"><span data-admin-i18n>操作</span></th></tr></thead>
           <tbody>
           {{range .Users}}
             <tr>
-              <td>
-                <div class="primary-cell">{{.Username}}{{if and $.User (eq .ID $.User.ID)}} <span class="badge accent">你</span>{{end}}</div>
-                <div class="secondary-cell">创建于 {{datetime .CreatedAt}}</div>
+              <td data-label="账号" data-admin-i18n-attrs="data-label">
+                <div class="primary-cell">{{.Username}}{{if and $.User (eq .ID $.User.ID)}} <span class="badge accent"><span data-admin-i18n>你</span></span>{{end}}</div>
+                <div class="secondary-cell"><span data-admin-i18n>创建于</span> {{datetime .CreatedAt}}</div>
               </td>
-              <td>
+              <td data-label="角色" data-admin-i18n-attrs="data-label">
                 {{if and $.User (eq .ID $.User.ID)}}
                   <span class="badge">{{.Role}}</span>
                 {{else}}
                   <form method="post" action="/admin/users/{{.ID}}/role" class="inline">
-                    <input type="hidden" name="csrf" value="{{$.CSRF}}">
-                    <select name="role" style="min-width:110px">
+                    <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
+                    <select name="role" style="min-width:110px" aria-label="修改 {{.Username}} 的角色">
                       {{$cur := .Role}}
-                      {{range $.Roles}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}
+                      {{range $.Roles}}<option value="{{.}}" {{if eq . $cur}}selected{{end}} data-admin-i18n-option>{{.}}</option>{{end}}
                     </select>
-                    <button class="btn sm" type="submit">保存</button>
+                    <button class="btn sm" type="submit"><span data-admin-i18n>保存</span></button>
                   </form>
                 {{end}}
               </td>
-              <td>
-                {{if .Disabled}}<span class="badge err">已停用</span>{{else}}<span class="badge ok"><span class="dot"></span>正常</span>{{end}}
+              <td data-label="状态" data-admin-i18n-attrs="data-label">
+                {{if .Disabled}}<span class="badge err"><span data-admin-i18n>已停用</span></span>{{else}}<span class="badge ok"><span class="dot"></span><span data-admin-i18n>正常</span></span>{{end}}
                 {{if .TOTPEnabled}}<span class="badge info">2FA</span>{{end}}
               </td>
-              <td class="secondary-cell">{{if .LastLoginAt}}{{datetime .LastLoginAt}}{{else}}—{{end}}</td>
-              <td class="actions">
+              <td class="secondary-cell" data-label="最近登录" data-admin-i18n-attrs="data-label">{{if .LastLoginAt}}{{datetime .LastLoginAt}}{{else}}—{{end}}</td>
+              <td class="actions" data-label="操作" data-admin-i18n-attrs="data-label">
                 {{if not (and $.User (eq .ID $.User.ID))}}
                   <form method="post" action="/admin/users/{{.ID}}/disable" class="inline" data-confirm="切换该账号的登录状态？">
-                    <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                    <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
                     {{if .Disabled}}<input type="hidden" name="enabled" value="1">{{end}}
                     <input type="hidden" name="disabled" value="{{if not .Disabled}}1{{end}}">
-                    <button class="btn sm" type="submit">{{if .Disabled}}启用{{else}}停用{{end}}</button>
+                    <button class="btn sm" type="submit">{{if .Disabled}}<span data-admin-i18n>启用</span>{{else}}<span data-admin-i18n>停用</span>{{end}}</button>
                   </form>
                   <form method="post" action="/admin/users/{{.ID}}/delete" class="inline" data-confirm="删除后不可恢复，确认？">
-                    <input type="hidden" name="csrf" value="{{$.CSRF}}">
-                    <button class="btn sm danger" type="submit">{{template "i_trash" .}}</button>
+                    <input type="hidden" name="csrf" value="{{$.CSRF}}">{{if $.ListReturn}}<input type="hidden" name="list_return" value="{{$.ListReturn}}">{{end}}
+                    <button class="btn sm danger" type="submit" aria-label="删除成员 {{.Username}}">{{template "i_trash" .}}</button>
                   </form>
                 {{else}}
-                  <span class="muted small">当前登录账号</span>
+                  <span class="muted small"><span data-admin-i18n>当前登录账号</span></span>
                 {{end}}
               </td>
             </tr>
-          {{end}}
+          {{else}}<tr><td colspan="5" class="muted"><span data-admin-i18n>没有符合条件的成员，请调整筛选或重置。</span></td></tr>{{end}}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  {{if gt .List.Pagination.Pages 1}}{{template "list_pager" .List.Pagination}}{{end}}
 </main>
 </div>
 </body>

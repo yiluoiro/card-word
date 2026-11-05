@@ -100,3 +100,14 @@ func (d *DB) PluginSettings(ctx context.Context, uid string) (map[string]string,
 	}
 	return out, wrapErr("list plugin settings", rows.Err())
 }
+
+func (d *DB) SetSettings(ctx context.Context, values map[string]string) error {
+	return d.tx(ctx, func(tx *sql.Tx) error {
+		for k, v := range values {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`, k, v, nowUnix()); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

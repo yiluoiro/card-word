@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -138,8 +139,12 @@ func (m *Manifest) Validate() error {
 	}
 	switch m.Runtime.Type {
 	case "external":
-		if !strings.HasPrefix(m.Runtime.BaseURL, "https://") && !strings.HasPrefix(m.Runtime.BaseURL, "http://") {
+		u, err := url.Parse(m.Runtime.BaseURL)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 			return errors.New("plugin: external runtime needs an http(s) base_url")
+		}
+		if m.Runtime.HealthPath != "" && !validEndpointPath(m.Runtime.HealthPath) {
+			return errors.New("plugin: invalid health path")
 		}
 		m.Runtime.BaseURL = strings.TrimRight(m.Runtime.BaseURL, "/")
 		if m.Runtime.TimeoutMS <= 0 || m.Runtime.TimeoutMS > 30000 {
@@ -179,6 +184,15 @@ func (m *Manifest) Validate() error {
 		dedupPerms = append(dedupPerms, p)
 	}
 	m.Permissions = dedupPerms
+	if m.Runtime.Type == "external" && !m.HasPermission(PermHTTPOutbound) {
+		return errors.New("plugin: external runtimes require http.outbound")
+	}
+	if m.Kind == KindPayment && !m.HasPermission(PermPaymentProvider) {
+		return errors.New("plugin: payment plugins require payment.provider")
+	}
+	if m.Payment != nil && m.Payment.CreatePath != "" && !validEndpointPath(m.Payment.CreatePath) {
+		return errors.New("plugin: invalid payment create path")
+	}
 	hooks := make([]string, 0, len(m.Hooks))
 	seenHooks := map[string]bool{}
 	for _, h := range m.Hooks {
@@ -188,6 +202,9 @@ func (m *Manifest) Validate() error {
 		}
 		if !KnownHooks[h] {
 			return fmt.Errorf("plugin: unknown hook %q", h)
+		}
+		if p := hookPermission(h); p != "" && !m.HasPermission(p) {
+			return fmt.Errorf("plugin: hook %s requires %s", h, p)
 		}
 		seenHooks[h] = true
 		hooks = append(hooks, h)
@@ -209,6 +226,22 @@ func (m *Manifest) Validate() error {
 		m.Description = m.Description[:2000]
 	}
 	return nil
+}
+
+// validEndpointPath prevents appended paths from changing URL authority.
+func validEndpointPath(path string) bool {
+	u, err := url.Parse(path)
+	return err == nil && strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "//") && !strings.Contains(path, "\\") && u.Host == "" && u.Scheme == "" && u.Fragment == ""
+}
+
+func hookPermission(event string) string {
+	if strings.HasPrefix(event, "order.") {
+		return PermOrderRead
+	}
+	if strings.HasPrefix(event, "product.") {
+		return PermProductRead
+	}
+	return ""
 }
 
 // HasPermission reports whether the plugin declared a permission.

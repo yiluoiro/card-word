@@ -1,0 +1,16 @@
+{{define "installation"}}{{template "head" .}}
+<body><main class="container narrow installation-page">
+<section class="panel"><div class="panel-head"><div><span class="overline">CARD WORD</span><h1>安装站点</h1><p class="panel-sub">创建管理员账号，完成后进入后台配置商品和收款方式。</p></div></div>
+<div class="panel-body"><ol class="installation-steps"><li>验证安装码</li><li>填写站点与账号</li><li>进入后台</li></ol>
+<div class="alert info"><div>当前访问地址：<strong>{{.BaseURL}}</strong><br>数据库和加密密钥已就绪。若域名不正确，请修改项目启动命令中的域名或 CARDWORD_BASE_URL 配置后重启。</div></div>
+{{if .Error}}<div class="alert err" role="alert">{{.Error}}</div>{{end}}
+<form class="form" action="/install" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>安装码<input name="install_token" type="password" required maxlength="43" minlength="43" autocomplete="off"><span class="hint">在宝塔文件管理中打开数据目录里的 install-token.txt，复制安装码。本项目简化包的数据目录是项目下的 data；系统服务安装包使用 /var/lib/cardword。</span></label>
+<label>站点名称<input name="site_name" value="{{.SiteName}}" required maxlength="80" autocomplete="organization"></label>
+<label>联系方式（可选）<input name="contact" value="{{.Contact}}" maxlength="200" placeholder="客服邮箱或其他联系方式"></label>
+<label>管理员用户名<input name="username" value="{{.Username}}" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_]{3,32}" autocomplete="username"><span class="hint">3–32 位字母、数字或下划线。</span></label>
+<label>管理员密码<input name="password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password"><span class="hint">至少 12 位，建议使用不同于其他网站的密码。</span></label>
+<label>确认密码<input name="confirm_password" type="password" required minlength="12" maxlength="1024" autocomplete="new-password"></label>
+<button class="btn primary block lg" type="submit">完成安装</button>
+<p class="hint">安装后将关闭此入口。不会创建演示商品，也不会将管理员密码保存到文件。</p>
+</form></div></section></main></body></html>{{end}}

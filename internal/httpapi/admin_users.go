@@ -9,16 +9,11 @@ import (
 
 // handleAdminUsers lists the team. Owner only.
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := s.db.ListUsers(r.Context())
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载账号失败。")
+	rows, view, ok := s.adminList(w, r, s.db, "users", "")
+	if !ok {
 		return
 	}
-	s.render(w, r, "admin_users", map[string]any{
-		"Title": "团队与权限",
-		"Users": users,
-		"Roles": []string{store.RoleOwner, store.RoleAdmin, store.RoleViewer},
-	})
+	s.render(w, r, "admin_users", map[string]any{"Title": "团队与权限", "Users": rows, "List": view, "Roles": []string{store.RoleOwner, store.RoleAdmin, store.RoleViewer}})
 }
 
 // handleAdminUserCreate adds a teammate.

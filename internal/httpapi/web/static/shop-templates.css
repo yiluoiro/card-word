@@ -1,0 +1,110 @@
+/* Store settings and the three independent storefront compositions. */
+.site-icon-panel {margin-bottom:20px}
+.site-icon-panel .panel-body,.icon-actions {display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.site-icon-panel .panel-body>div {flex:1 1 240px;min-width:0}
+.site-icon-panel img {object-fit:contain;border:1px solid var(--border);border-radius:12px;padding:5px;background:var(--surface-2)}
+.icon-actions input {max-width:100%}
+.shop-edition {max-width:1400px;margin:auto;padding:clamp(18px,4vw,60px);overflow-wrap:anywhere}
+.shop-edition :is(h1,h2,h3,p) {margin:0}
+.shop-edition :is(h1,h2,h3) {line-height:1.16}
+.shop-edition section[id],.edition-cats {scroll-margin-top:calc(var(--shop-header-height,72px) + 18px)}
+.shop-edition a:focus-visible {outline:3px solid var(--primary);outline-offset:3px}
+.edition-kicker,.edition-count,.journal-folio,.journal-byline {font-size:.77rem;font-weight:700;letter-spacing:.08em}
+.edition-count {white-space:nowrap;color:var(--text-3)}
+.edition-heading,.journal-tools {display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.edition-heading h2 {font-size:clamp(24px,3.3vw,42px)}
+.edition-heading p,.directory-rail p,.edition-support p {color:var(--text-3);margin-top:.4em}
+.edition-search {display:flex;max-width:100%;align-items:stretch}
+.edition-search input {width:clamp(120px,20vw,260px);min-width:0;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);padding:8px 12px;border-radius:8px 0 0 8px}
+.edition-search button {border-radius:0 8px 8px 0}
+.edition-cats {display:flex;gap:8px;flex-wrap:wrap}
+.edition-cats a {padding:5px 14px;border:1px solid var(--border-strong);border-radius:20px;color:var(--text-2);font-size:.9rem}
+.edition-cats a[aria-current],.edition-cats a:hover {background:var(--primary-weak);color:var(--primary);border-color:var(--primary)}
+.edition-image {position:relative;overflow:hidden;background:var(--surface-2)}
+.edition-image img,.directory-thumb img {display:block;width:100%;height:100%;object-fit:contain}
+.edition-artwork {position:relative;display:block;width:100%;height:100%;overflow:hidden;background:var(--primary-weak-2);color:var(--primary)}
+.edition-artwork i {position:absolute;border:clamp(8px,1.6vw,22px) solid currentColor;width:48%;aspect-ratio:1;border-radius:50%;left:12%;top:12%}
+.edition-artwork i+i {left:44%;top:-24%;border-radius:10%;transform:rotate(35deg);opacity:.5}
+.edition-artwork b {position:absolute;bottom:7%;right:7%;font:700 1em/1 monospace;letter-spacing:.15em}
+.edition-stock {font-size:.78rem;color:var(--text-3)}
+.edition-stock.available {color:var(--primary)}
+.edition-stock.available:before {content:"";display:inline-block;width:6px;height:6px;background:currentColor;border-radius:50%;vertical-align:middle;margin-right:5px}
+.edition-price {font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.edition-support {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;border-top:1px solid var(--border-strong);margin-top:54px;padding:26px 0}
+.edition-support h2 {font-size:1rem;margin-bottom:10px}
+.edition-support summary {cursor:pointer}
+.studio-cover {display:grid;grid-template-columns:1.1fr 1fr;align-items:center;gap:24px;background:var(--primary-weak);border-radius:28px;overflow:hidden;padding:clamp(24px,5vw,78px);margin-bottom:42px;position:relative}
+.studio-cover h1 {font-size:clamp(35px,5.3vw,80px);letter-spacing:-.05em;margin:12px 0}
+.studio-cover p {color:var(--text-2);margin-bottom:22px}
+.studio-print {height:clamp(160px,20vw,290px);display:grid;place-items:center;isolation:isolate;position:relative}
+.studio-print i {position:absolute;width:65%;height:75%;background:var(--text);border-radius:16px;transform:rotate(-17deg) translateX(-9%)}
+.studio-print i+i {background:var(--primary);transform:rotate(13deg) translateX(10%)}
+.studio-print i+i+i {background:repeating-linear-gradient(45deg,transparent 0 8px,#ffffff30 9px 11px),var(--primary);transform:rotate(-3deg);box-shadow:0 18px 35px #0002}
+.studio-print b {z-index:1;color:var(--surface);max-width:52%;transform:rotate(-3deg);font-size:clamp(1rem,2vw,2rem);text-align:center}
+.studio-shop .edition-cats {margin:20px 0}
+.studio-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.studio-item {color:var(--text);border:1px solid var(--border);background:var(--surface);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.studio-item .edition-image {aspect-ratio:2/1}
+.studio-caption {padding:16px 20px 21px}
+.studio-caption h3 {margin:6px 0 12px;font-size:1.22rem}
+.studio-item:hover,.directory-row:hover,.journal-story a:hover h3 {color:var(--primary)}
+[data-store-style=minimal] .tenant-store {background:var(--surface)}
+.directory-layout {display:grid;grid-template-columns:minmax(180px,24%) minmax(0,1fr);gap:clamp(20px,4vw,64px)}
+.directory-rail {align-self:start;border-right:1px solid var(--border-strong);padding-right:24px}
+.directory-rail h1 {font-size:clamp(25px,3.1vw,44px);margin-top:10px}
+.directory-rail h2 {font-size:.82rem;color:var(--text-3);margin:32px 0 10px}
+.directory-rail .edition-cats {display:grid;gap:3px}
+.directory-rail .edition-cats a {border:0;border-left:3px solid transparent;border-radius:0}
+.directory-rail .edition-cats a[aria-current] {border-color:var(--primary)}
+.directory-main .edition-heading {padding:4px 0 18px;border-bottom:2px solid var(--text)}
+.directory-main .edition-search {margin:20px 0}
+.directory-main .edition-search input {flex:1;width:auto}
+.directory-row {display:grid;grid-template-columns:44px minmax(0,1fr) 5em max-content 18px;align-items:center;gap:14px;border-bottom:1px solid var(--border);padding:12px 4px;color:var(--text)}
+.directory-row h3 {font-size:1rem}.directory-row small {color:var(--text-3)}
+.directory-thumb {height:44px;background:var(--surface-2);overflow:hidden}.directory-thumb .edition-artwork i {border-width:4px}.directory-thumb .edition-artwork b {display:none}
+[data-store-style=editorial] .tenant-store {--paper:#f7f3e9;--ink:#28251f;background:var(--paper);color:var(--ink)}
+[data-theme=dark][data-store-style=editorial] .tenant-store {--paper:#211f1b;--ink:#eee8da}
+.journal-mast {text-align:center;border-bottom:5px double var(--ink);padding-bottom:24px}
+.journal-folio {display:flex;justify-content:space-between;gap:20px;border-block:1px solid var(--ink);padding:6px 0}
+.journal-mast h1,.journal-shop h2,.journal-story h3 {font-family:Georgia,"Songti SC","SimSun",serif;font-weight:600}
+.journal-mast h1 {font-size:clamp(44px,7.6vw,108px);letter-spacing:-.045em;margin:25px auto 8px}
+.journal-shop>.edition-heading {padding:22px 0 14px}
+.journal-tools {padding-bottom:16px;border-bottom:1px solid var(--ink)}
+.journal-tools .edition-cats a {border:none;border-radius:0;padding:4px 6px}
+.journal-tools .edition-cats a[aria-current] {background:none;text-decoration:underline;text-underline-offset:5px}
+.journal-spread {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:24px;padding-top:22px}
+.journal-story a {color:inherit;display:block}
+.journal-story .edition-image {aspect-ratio:1.65}
+.journal-lead {grid-column:span 2;grid-row:span 2}
+.journal-lead .edition-image {aspect-ratio:1.8}
+.journal-byline {display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px}
+.journal-story h3 {font-size:clamp(22px,2.2vw,34px)}
+.journal-lead h3 {font-size:clamp(30px,3.8vw,55px)}
+.journal-story p {color:var(--text-2);margin:6px 0}
+.journal-story .edition-price {display:block;margin:10px 0;border-top:1px solid var(--border-strong);padding-top:6px}
+.template-mini-minimal {display:grid;grid-template-columns:26% 1fr;grid-template-rows:auto 1fr;gap:8px}
+.template-mini-minimal .mini-nav {grid-row:span 2;width:100%;height:100%;background:var(--primary-weak-2);margin:0;border-radius:0}
+.template-mini-minimal .mini-hero {width:60%;height:12px;margin:0}
+.template-mini-minimal .mini-grid {display:grid;grid-template-columns:1fr;gap:4px;margin:0}
+.template-mini-minimal .mini-grid i {height:auto;border-radius:0;border-width:0 0 1px}
+.template-mini-editorial {background:#f4efe3}.template-mini-editorial .mini-nav {height:4px;width:100%;background:#605749}.template-mini-editorial .mini-hero {margin:0 auto 10px;width:62%;height:17px;background:#514b40}
+.template-mini-editorial .mini-grid {grid-template-columns:2fr 1fr;grid-template-rows:30px 30px}.template-mini-editorial .mini-grid i {height:auto;border-radius:0;background:#d5cbb8}.template-mini-editorial .mini-grid i:first-child {grid-row:span 2}.template-mini-editorial .mini-grid i:last-child {display:block}
+@media(max-width:740px){
+ .studio-cover {grid-template-columns:1fr;gap:4px}.studio-print {height:150px}.studio-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .directory-layout {grid-template-columns:1fr;gap:20px}.directory-rail {border:none;padding:0}.directory-rail h2 {margin-top:12px}.directory-rail .edition-cats {display:flex}.directory-rail .edition-cats a {border:none}
+ .journal-spread {grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.journal-lead {grid-row:auto}
+ .edition-support {grid-template-columns:1fr;gap:18px;margin-top:30px}
+}
+@media(max-width:480px){
+ .studio-caption {padding:10px}.studio-caption h3 {font-size:1rem}.studio-cover {border-radius:16px}
+ .directory-row {grid-template-columns:36px minmax(0,1fr) auto;gap:4px 9px}.directory-thumb {grid-row:span 2;height:36px}.directory-row .edition-stock {grid-column:2;grid-row:2}.directory-row .edition-price {grid-column:3;grid-row:1 / span 2}.directory-row>svg {display:none}
+ .journal-tools .edition-search,.journal-tools input,.studio-shop .edition-search,.studio-shop .edition-search input {width:100%}
+}
+/* Carry each edition into the product details while keeping checkout controls familiar. */
+[data-store-style=minimal] .product-page :is(.panel,.buy-card) {border-radius:3px;box-shadow:none}
+[data-store-style=minimal] .product-page .panel-head {padding-block:14px}
+[data-store-style=editorial] .product-page {background:#f7f3e9}
+[data-theme=dark][data-store-style=editorial] .product-page {background:#211f1b}
+[data-store-style=editorial] .product-page .product-title {font:600 clamp(28px,4vw,54px)/1.15 Georgia,"Songti SC","SimSun",serif}
+[data-store-style=editorial] .product-page :is(.panel,.buy-card) {border-radius:0;border-top:2px solid var(--text);box-shadow:none}
+@media(min-width:1060px){[data-store-style=minimal] .product-page .two-col {grid-template-columns:minmax(340px,2fr) minmax(0,3fr)}[data-store-style=minimal] .product-page .buy-card {grid-column:1;grid-row:1}[data-store-style=minimal] .product-page .two-col>div:first-child {grid-column:2;grid-row:1}}

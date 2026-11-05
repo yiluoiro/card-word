@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +26,11 @@ var staticFS embed.FS
 // Templates parses the embedded template set.
 func Templates() (*template.Template, error) {
 	funcs := template.FuncMap{
+		"expired":     func(t *time.Time) bool { return t != nil && !time.Now().Before(*t) },
+		"brandImage":  productBrandImage,
 		"money":       formatMoney,
+		"markdown":    renderMarkdown,
+		"mdExcerpt":   markdownExcerpt,
 		"moneyShort":  moneyShort,
 		"datetime":    formatTime,
 		"date":        func(t time.Time) string { return t.Local().Format("2006-01-02") },
@@ -191,6 +197,7 @@ type viewData struct {
 }
 
 type siteInfo struct {
+	IconURL     string
 	Name        string
 	Tagline     string
 	Notice      string
@@ -203,44 +210,71 @@ func (s *Server) baseData(r *http.Request) map[string]any {
 	user, _ := r.Context().Value(ctxUser).(*store.User)
 	csrf, _ := r.Context().Value(ctxCSRF).(string)
 	currency := s.setting(store.SettingCurrency, "CNY")
+	appearance := s.appearance(r)
+	style, accent := "", ""
+	if appearance.Style != "default" && !strings.HasPrefix(r.URL.Path, "/admin") {
+		style, accent = appearance.Style, appearance.Accent
+	}
+
 	return map[string]any{
 		"Site": siteInfo{
+			IconURL:     s.siteIconURL(),
 			Name:        s.setting(store.SettingSiteName, "Card Word"),
-			Tagline:     s.setting(store.SettingSiteTagline, "即时自动发卡 · 安全 · 轻量"),
+			Tagline:     s.setting(store.SettingSiteTagline, "数字商品与礼品卡，付款确认后查看卡密。"),
 			Notice:      s.setting(store.SettingSiteNotice, ""),
 			Contact:     s.setting(store.SettingContactEmail, ""),
 			Maintenance: s.setting(store.SettingMaintenance, "0") == "1",
 		},
-		"User":     user,
-		"CSRF":     csrf,
-		"Path":     r.URL.Path,
-		"Query":    r.URL.Query().Get("q"),
-		"Flash":    r.URL.Query().Get("ok"),
-		"Error":    r.URL.Query().Get("err"),
-		"Currency": currency,
-		"Version":  version.Version,
+		"User":                user,
+		"PublicAnnouncements": s.visibleAnnouncements(r),
+		"CanManage":           user != nil && store.RoleRank(user.Role) >= store.RoleRank(store.RoleAdmin),
+		"Customer":            s.currentCustomer(r),
+		"CSRF":                csrf,
+		"Path":                r.URL.Path,
+		"Query":               r.URL.Query().Get("q"),
+		"Flash":               r.URL.Query().Get("ok"),
+		"Error":               r.URL.Query().Get("err"),
+		"Currency":            currency,
+		"Version":             version.Version,
+		"CurrentYear":         time.Now().Year(),
+		"ShopStyle":           style,
+		"ShopAccent":          accent,
+		"ShopCustomized":      appearance.Style != "default",
+		"Appearance":          appearance,
+		"AppearancePreview":   r.Context().Value(ctxAppearance) != nil,
 	}
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data map[string]any) {
+	s.renderStatus(w, r, http.StatusOK, name, data)
+}
+
+func (s *Server) renderStatus(w http.ResponseWriter, r *http.Request, status int, name string, data map[string]any) {
 	if s.tmpl == nil {
 		http.Error(w, "templates unavailable", http.StatusInternalServerError)
 		return
 	}
 	base := s.baseData(r)
+	if strings.HasPrefix(r.URL.Path, "/admin") {
+		base["ListReturn"] = listReturn(r.URL.RequestURI(), r.URL.Path)
+	}
 	for k, v := range data {
 		base[k] = v
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, base); err != nil {
+	base["SEO"] = s.metadata(r, name, status, base)
+	var body bytes.Buffer
+	if err := s.tmpl.ExecuteTemplate(&body, name, base); err != nil {
 		s.log.Error("template render failed", "template", name, "error", err, "rid", requestIDFrom(r.Context()))
 		http.Error(w, "template error", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = w.Write(body.Bytes())
 }
 
 func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, msg string) {
-	w.WriteHeader(status)
-	s.render(w, r, "error", map[string]any{
+	s.renderStatus(w, r, status, "error", map[string]any{
 		"Status":  status,
 		"Message": msg,
 	})
@@ -268,6 +302,15 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 
 // flashRedirect sends the operator back with a message in the query string.
 func flashRedirect(w http.ResponseWriter, r *http.Request, path, ok, errMsg string) {
+	base, err := url.Parse(listReturn(r.FormValue("list_return"), path))
+	if err != nil {
+		base = &url.URL{Path: path}
+	}
+	params := base.Query()
+	if strings.HasPrefix(path, "/admin/orders/") && r.FormValue("return_to") != "" {
+		params.Set("return_to", listReturn(r.FormValue("return_to"), "/admin/orders"))
+	}
+
 	q := ""
 	if ok != "" {
 		q = "ok=" + urlEscape(ok)
@@ -278,6 +321,11 @@ func flashRedirect(w http.ResponseWriter, r *http.Request, path, ok, errMsg stri
 		}
 		q += "err=" + urlEscape(errMsg)
 	}
+	extra, _ := url.ParseQuery(q)
+	for k, vs := range extra {
+		params[k] = vs
+	}
+	q = params.Encode()
 	target := path
 	if q != "" {
 		if strings.Contains(target, "?") {

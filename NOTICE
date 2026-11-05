@@ -1,0 +1,11 @@
+Card Word Community
+Copyright 2026 card word contributors
+
+This single-store edition is derived from Card Word and distributed under
+the Apache License, Version 2.0. The source split, removal of multi-merchant
+platform services, and remote marketplace defaults were made on 2026-11-05.
+
+Third-party dependencies retain their respective licenses. Binary release
+packages include available upstream license texts in licenses/.
+Payment provider SVG marks from Simple Icons are licensed CC0-1.0.
+Brand names and trademarks remain the property of their respective owners.

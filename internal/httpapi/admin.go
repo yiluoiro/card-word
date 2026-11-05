@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -23,17 +24,7 @@ func (s *Server) reloadIntegrations(ctx context.Context) {
 	instructions, _ := s.db.GetSetting(ctx, "payment.manual.instructions", "")
 	s.payments.Register(&payment.Manual{Instructions: instructions})
 
-	gateway, _ := s.db.GetSetting(ctx, "payment.epay.gateway", "")
-	pid, _ := s.db.GetSetting(ctx, "payment.epay.pid", "")
-	key, _ := s.db.GetSetting(ctx, "payment.epay.key", "")
-	payType, _ := s.db.GetSetting(ctx, "payment.epay.type", "alipay")
-	if gateway != "" && pid != "" && key != "" {
-		if ep, err := payment.NewEpay(payment.EpayConfig{GatewayURL: gateway, PID: pid, Key: key, PayType: payType}); err == nil {
-			s.payments.Register(ep)
-		} else {
-			s.log.Warn("epay driver disabled", "error", err)
-		}
-	}
+	s.reloadBuiltinPayments(ctx)
 
 	if s.notifier != nil {
 		host, _ := s.db.GetSetting(ctx, "smtp.host", "")
@@ -53,6 +44,8 @@ func (s *Server) reloadIntegrations(ctx context.Context) {
 			if sender != nil {
 				s.notifier.SetSenders([]notify.Sender{sender})
 			}
+		} else {
+			s.notifier.SetSenders(nil)
 		}
 	}
 }
@@ -83,7 +76,51 @@ func orDefault(v, def string) string {
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	stats, err := s.db.Stats(ctx)
+	currency := s.setting(store.SettingCurrency, "CNY")
+	currencies, err := s.db.OrderCurrencies(ctx)
+	if err != nil {
+		s.renderError(w, r, 500, "加载统计币种失败。")
+		return
+	}
+	found := false
+	for _, c := range currencies {
+		if c == currency {
+			found = true
+		}
+	}
+	if !found {
+		currencies = append([]string{currency}, currencies...)
+	}
+	for _, c := range currencies {
+		if r.URL.Query().Get("currency") == c {
+			currency = c
+			break
+		}
+	}
+	now := time.Now().UTC()
+	period, err := parseDashboardPeriod(r.URL.Query(), now)
+	if err != nil {
+		s.renderError(w, r, 400, err.Error())
+		return
+	}
+	periodStats, err := s.db.PeriodStats(ctx, currency, period.Start, period.End)
+	if err != nil {
+		s.renderError(w, r, 500, "加载周期统计失败。")
+		return
+	}
+	previous, err := s.db.PeriodStats(ctx, currency, period.Start.Add(-period.End.Sub(period.Start)), period.Start)
+	if err != nil {
+		s.renderError(w, r, 500, "加载对比统计失败。")
+		return
+	}
+	month, _ := parseDashboardPeriod(nil, now)
+	monthStats, err := s.db.PeriodStats(ctx, currency, month.Start, month.End)
+	if err != nil {
+		s.renderError(w, r, 500, "加载本月统计失败。")
+		return
+	}
+	exportQuery := url.Values{"currency": {currency}, "from": {period.From}, "to": {period.To}}
+	stats, err := s.db.StatsCurrency(ctx, currency)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "加载统计失败。")
 		return
@@ -93,64 +130,58 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "加载订单失败。")
 		return
 	}
-	products, err := s.db.ListProducts(ctx, store.ProductFilter{Limit: 200})
+	stockFilter := store.ProductFilter{Status: store.ProductActive, Stock: "low", Limit: 8}
+	lowCount, err := s.db.CountProducts(ctx, stockFilter)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载商品失败。")
+		s.renderError(w, r, 500, "加载库存统计失败。")
 		return
 	}
-	lowStock := make([]store.Product, 0, 8)
-	for _, p := range products {
-		if p.Stock <= 3 && p.Status == store.ProductActive {
-			lowStock = append(lowStock, p)
-		}
-	}
-	daily, err := s.db.DailyStats(ctx, 7)
+	lowStock, err := s.db.ListProducts(ctx, stockFilter)
 	if err != nil {
-		s.log.Warn("daily stats failed", "error", err)
-		daily = nil
+		s.renderError(w, r, 500, "加载库存失败。")
+		return
 	}
-	currency := s.setting(store.SettingCurrency, "CNY")
-	var maxOrders int64 = 1
-	for _, d := range daily {
-		if d.Orders > maxOrders {
-			maxOrders = d.Orders
-		}
+	tasks, err := s.workspaceTasks(r, lowCount)
+	if err != nil {
+		s.renderError(w, r, 500, "加载经营待办失败。")
+		return
 	}
-	trend := make([]map[string]any, 0, len(daily))
-	var ordersSeries, revenueSeries []int64
+	daily, err := s.db.DailyStatsCurrency(ctx, 7, currency)
+	if err != nil {
+		s.renderError(w, r, 500, "加载订单趋势失败。")
+		return
+	}
+	var ordersSeries, revenueSeries, pendingSeries, paidSeries []int64
 	for _, d := range daily {
 		ordersSeries = append(ordersSeries, d.Orders)
+		pendingSeries = append(pendingSeries, d.PendingOrders)
+		paidSeries = append(paidSeries, d.PaidOrders)
 		revenueSeries = append(revenueSeries, d.RevenueCents)
-		height := int(d.Orders * 100 / maxOrders)
-		if d.Orders > 0 && height < 8 {
-			height = 8
-		}
-		label := d.Date
-		if len(label) >= 10 {
-			label = label[5:]
-		}
-		trend = append(trend, map[string]any{
-			"Label":   label,
-			"Orders":  d.Orders,
-			"Revenue": formatMoney(d.RevenueCents, currency),
-			"Height":  height,
-		})
 	}
 
-	var pluginCount int
-	if s.plugins != nil {
-		pluginCount = len(s.plugins.Active())
-	}
 	s.render(w, r, "admin_dashboard", map[string]any{
-		"Title":        "概览",
-		"Stats":        stats,
-		"Orders":       orders,
-		"Products":     products,
-		"LowStock":     lowStock,
-		"PluginCount":  pluginCount,
-		"Trend":        trend,
-		"SparkOrders":  sparklinePoints(ordersSeries),
-		"SparkRevenue": sparklinePoints(revenueSeries),
+		"TodayUTC":        now.Format("2006-01-02"),
+		"Period":          period,
+		"PeriodStats":     periodStats,
+		"MonthStats":      monthStats,
+		"PeriodExportURL": "/admin/orders/export.csv?" + exportQuery.Encode(),
+		"OrdersChange":    periodChange(periodStats.Orders, previous.Orders),
+		"RevenueChange":   periodChange(periodStats.Revenue, previous.Revenue),
+		"CompletedChange": periodChange(periodStats.Completed, previous.Completed),
+		"ClosedChange":    periodChange(periodStats.Closed, previous.Closed),
+		"Chart":           buildDashboardChart(daily, currency),
+		"Title":           "概览",
+		"Currency":        currency,
+		"Currencies":      currencies,
+		"Stats":           stats,
+		"Orders":          orders,
+		"Tasks":           tasks,
+		"LowStockCount":   lowCount,
+		"LowStock":        lowStock,
+		"SparkOrders":     sparklinePoints(ordersSeries),
+		"SparkRevenue":    sparklinePoints(revenueSeries),
+		"SparkPending":    sparklinePoints(pendingSeries),
+		"SparkPaid":       sparklinePoints(paidSeries),
 	})
 }
 
@@ -189,15 +220,17 @@ func sparklinePoints(values []int64) string {
 // ---------- categories ----------
 
 func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
-	cats, err := s.db.ListCategories(r.Context(), false)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载分类失败。")
+	rows, view, ok := s.adminList(w, r, s.db, "categories", "")
+	if !ok {
 		return
 	}
-	s.render(w, r, "admin_categories", map[string]any{"Title": "分类管理", "Categories": cats})
+	s.render(w, r, "admin_categories", map[string]any{"Title": "分类管理", "Categories": rows, "List": view})
 }
 
 func (s *Server) handleAdminCategorySave(w http.ResponseWriter, r *http.Request) {
+	if !s.requireStaffRole(w, r, store.RoleAdmin) {
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		s.renderError(w, r, http.StatusBadRequest, "表单格式错误。")
 		return
@@ -207,18 +240,30 @@ func (s *Server) handleAdminCategorySave(w http.ResponseWriter, r *http.Request)
 	sortOrder := int(parseInt64(r.FormValue("sort")))
 	visible := r.FormValue("visible") != ""
 	if name == "" {
-		flashRedirect(w, r, "/admin/categories", "", "分类名称不能为空。")
+		s.editOrRedirect(w, r, "categories", "分类名称不能为空。")
 		return
 	}
-	if _, err := s.db.CreateCategory(r.Context(), name, slug, sortOrder, visible); err != nil {
-		flashRedirect(w, r, "/admin/categories", "", "创建失败："+err.Error())
+	var err error
+	if id := parseInt64(r.FormValue("id")); id > 0 {
+		if slug == "" {
+			slug = store.Slugify(name)
+		}
+		err = s.db.UpdateCategory(r.Context(), &store.Category{ID: id, Name: name, Slug: slug, Sort: sortOrder, Visible: visible})
+	} else {
+		_, err = s.db.CreateCategory(r.Context(), name, slug, sortOrder, visible)
+	}
+	if err != nil {
+		s.editOrRedirect(w, r, "categories", "保存失败，请检查重复名称或别名。")
 		return
 	}
-	s.audit(r, "category.create", name, "")
-	flashRedirect(w, r, "/admin/categories", "分类已创建", "")
+	s.audit(r, "category.save", name, "")
+	flashRedirect(w, r, "/admin/categories", "分类已保存", "")
 }
 
 func (s *Server) handleAdminCategoryDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.requireStaffRole(w, r, store.RoleAdmin) {
+		return
+	}
 	id := parseInt64(r.PathValue("id"))
 	if err := s.db.DeleteCategory(r.Context(), id); err != nil {
 		flashRedirect(w, r, "/admin/categories", "", "删除失败。")
@@ -248,6 +293,7 @@ func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "加载设置失败。")
 		return
 	}
+
 	drivers := make([]map[string]string, 0, 8)
 	for _, d := range s.allDrivers() {
 		drivers = append(drivers, map[string]string{"Name": d.Name(), "Title": d.Title()})
@@ -285,6 +331,7 @@ func (s *Server) handleAdminSettingsSave(w http.ResponseWriter, r *http.Request)
 		"smtp.from",
 		"smtp.from_name",
 	}
+
 	for _, k := range keys {
 		if !r.Form.Has(k) {
 			continue
@@ -311,6 +358,7 @@ func (s *Server) handleAdminSettingsSave(w http.ResponseWriter, r *http.Request)
 	if r.FormValue("smtp.tls") != "" {
 		smtpTLS = "1"
 	}
+
 	_ = s.db.SetSetting(ctx, "smtp.tls", smtpTLS)
 
 	if err := s.reloadSettings(ctx); err != nil {
@@ -324,57 +372,24 @@ func (s *Server) handleAdminSettingsSave(w http.ResponseWriter, r *http.Request)
 // ---------- audit ----------
 
 func (s *Server) handleAdminAudit(w http.ResponseWriter, r *http.Request) {
-	action := strings.TrimSpace(r.URL.Query().Get("action"))
-	const pageSize = 100
-	page := int(parseInt64(r.URL.Query().Get("page")))
-	if page < 1 {
-		page = 1
-	}
-	total, err := s.db.CountAudit(r.Context(), action)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载审计日志失败。")
+	rows, view, ok := s.adminList(w, r, s.db, "audit", "")
+	if !ok {
 		return
 	}
-	pages := (total + pageSize - 1) / pageSize
-	if pages < 1 {
-		pages = 1
-	}
-	if page > pages {
-		page = pages
-	}
-	entries, err := s.db.ListAudit(r.Context(), action, pageSize, (page-1)*pageSize)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载审计日志失败。")
-		return
-	}
-	queryBase := ""
-	if action != "" {
-		queryBase = "action=" + urlEscape(action) + "&"
-	}
-	s.render(w, r, "admin_audit", map[string]any{
-		"Title":      "审计日志",
-		"Entries":    entries,
-		"Action":     action,
-		"Page":       page,
-		"TotalPages": pages,
-		"Total":      total,
-		"QueryBase":  queryBase,
-	})
+	s.render(w, r, "admin_audit", map[string]any{"Title": "审计日志", "Entries": rows, "List": view})
 }
 
 // ---------- API tokens ----------
 
 func (s *Server) handleAdminTokens(w http.ResponseWriter, r *http.Request) {
-	tokens, err := s.db.ListAPITokens(r.Context())
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "加载令牌失败。")
+	s.renderTokens(w, r, "")
+}
+func (s *Server) renderTokens(w http.ResponseWriter, r *http.Request, plain string) {
+	rows, view, ok := s.adminList(w, r, s.db, "tokens", "")
+	if !ok {
 		return
 	}
-	s.render(w, r, "admin_tokens", map[string]any{
-		"Title":    "API 令牌",
-		"Tokens":   tokens,
-		"NewToken": r.URL.Query().Get("token"),
-	})
+	s.render(w, r, "admin_tokens", map[string]any{"Title": "API 令牌", "Tokens": rows, "List": view, "NewToken": plain})
 }
 
 func (s *Server) handleAdminTokenCreate(w http.ResponseWriter, r *http.Request) {
@@ -404,7 +419,9 @@ func (s *Server) handleAdminTokenCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.audit(r, "token.create", token.Name, strings.Join(scopes, ","))
-	flashRedirect(w, r, "/admin/tokens?token="+urlEscape(plain), "令牌已创建，请立即保存", "")
+	// Display once in the POST response, never in URLs/history/access logs.
+	w.Header().Set("Cache-Control", "no-store")
+	s.renderTokens(w, r, plain)
 }
 
 func (s *Server) handleAdminTokenRevoke(w http.ResponseWriter, r *http.Request) {

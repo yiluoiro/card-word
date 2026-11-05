@@ -6,6 +6,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -126,6 +128,9 @@ func Load(args []string) (*Config, error) {
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
+	if *showVersion {
+		return &Config{ShowVersion: true}, nil
+	}
 
 	cfg := &Config{
 		Addr:        *addr,
@@ -143,7 +148,7 @@ func Load(args []string) (*Config, error) {
 	cfg.PluginDir = env("CARDWORD_PLUGIN_DIR", filepath.Join(cfg.DataDir, "plugins"))
 	cfg.AdminUser = env("CARDWORD_ADMIN_USER", "admin")
 	cfg.AdminPassword = env("CARDWORD_ADMIN_PASSWORD", "")
-	cfg.MarketURL = env("CARDWORD_MARKET_URL", "")
+	cfg.MarketURL = env("CARDWORD_MARKET_URL", "https://zinvmeng.com/market/index.json")
 	cfg.MarketAllowInstall = envBool("CARDWORD_MARKET_ALLOW_INSTALL", true)
 	cfg.RequirePluginSignature = envBool("CARDWORD_PLUGIN_REQUIRE_SIGNATURE", false)
 	cfg.PluginPublicKeys = splitList(env("CARDWORD_PLUGIN_PUBLIC_KEYS", ""))
@@ -185,6 +190,20 @@ func Load(args []string) (*Config, error) {
 		return nil, err
 	}
 	cfg.ReadPoolSize = pool
+	if cfg.BaseURL == "" {
+		host, port, err := net.SplitHostPort(cfg.Addr)
+		if err != nil {
+			return nil, fmt.Errorf("config: invalid listen address: %w", err)
+		}
+		if host == "" || host == "0.0.0.0" || host == "::" {
+			host = "localhost"
+		}
+		cfg.BaseURL = "http://" + net.JoinHostPort(host, port)
+	}
+	public, err := url.Parse(cfg.BaseURL)
+	if err != nil || (public.Scheme != "http" && public.Scheme != "https") || public.Hostname() == "" || public.User != nil || public.RawQuery != "" || public.Fragment != "" || public.Path != "" {
+		return nil, errors.New("config: base-url must be an HTTP(S) origin without credentials, path, query or fragment")
+	}
 
 	key := env("CARDWORD_MASTER_KEY", "")
 	if key == "" {
@@ -212,15 +231,6 @@ func Load(args []string) (*Config, error) {
 		cfg.MasterKey = parsed
 	}
 
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = "http://localhost" + cfg.Addr
-		if strings.HasPrefix(cfg.Addr, ":") {
-			cfg.BaseURL = "http://localhost" + cfg.Addr
-		}
-	}
-	if !strings.HasPrefix(cfg.BaseURL, "http://") && !strings.HasPrefix(cfg.BaseURL, "https://") {
-		return nil, errors.New("config: base-url must start with http:// or https://")
-	}
 	if cfg.RequirePluginSignature && len(cfg.PluginPublicKeys) == 0 {
 		return nil, errors.New("config: plugin signature is required but no public keys are configured")
 	}
