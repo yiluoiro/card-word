@@ -50,11 +50,17 @@ Use the token at `/install` to create the owner account. The `cardword-data` vol
 
 ## Testing and packaging
 
+**Admin updates (v1.0.0 onward).** Each admin page checks for a stable GitHub release; click the version in the top bar to refresh immediately. The dialog shows release notes. Only the store owner can change the trusted public GitHub repository, install an update, or restart the shop. Installing downloads the executable for this OS and architecture and verifies its GitHub SHA-256 digest. The current version runs until the owner selects **Restart to apply**. The launcher drains requests, closes the database, and starts the new worker with the original arguments. If startup fails before the database and listener are ready, the previous executable starts again.
+
+Install v1.0.0 manually once when upgrading from a version without the updater. Keep the data volume across container replacements. Its `updates/` directory must allow the service account to write and execute files. Back up before upgrading: executable fallback does not reverse database migrations.
+
+To publish an update, push a tested stable tag such as `v1.0.1`. The release workflow publishes standalone Linux, Windows, and macOS binaries (amd64/arm64). Write notes in `docs/releases/<tag>.md` or use the automatically generated GitHub notes.
+
 ```bash
 go test ./... -count=1
 go vet ./...
 python scripts/package_source.py
-python scripts/build_baota.py --panel --version 0.1.0-community
+python scripts/build_baota.py --panel --version v1.0.0
 ```
 
 The source archive is written to `dist/cardword-community-source.zip`; BaoTa packages are written to `dist/releases/`. The packaging scripts exclude local shop data, secret keys, and proprietary platform code.

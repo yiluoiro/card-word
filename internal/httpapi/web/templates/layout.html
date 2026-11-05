@@ -30,6 +30,7 @@
 <link rel="stylesheet" href="/static/shop-templates.css?v={{version}}-1">
 {{if and .Path (hasPrefix .Path "/admin")}}<link rel="stylesheet" href="/static/admin.css?v={{version}}-5">
 <script src="/static/admin.js?v={{version}}-4" defer></script>
+{{if .User}}<script src="/static/update.js?v={{version}}" defer></script>{{end}}
 <script src="/static/admin-translations.js?v={{version}}-editions-9" defer></script>
 <script src="/static/admin-i18n.js?v={{version}}-1" defer></script>
 <script src="/static/markdown-editor.js?v={{version}}-1" defer></script>{{end}}
@@ -128,6 +129,7 @@
   </div>
   <div class="spacer"></div>
   <div class="topbar-actions">
+    {{if .User}}<button type="button" class="btn sm version-trigger" data-update-open title="检查项目更新" data-admin-i18n-attrs="title" aria-haspopup="dialog">{{.Version}}</button>{{end}}
     {{if .Site.Maintenance}}<span class="badge warn"><span data-admin-i18n>维护模式</span></span>{{end}}
     {{template "admin_language" .}}<span class="topbar-divider" aria-hidden="true"></span>
     <button class="btn topbar-icon workspace-search-trigger" type="button" data-command-open aria-label="查找后台功能" title="查找功能 · Ctrl/Cmd K" data-admin-i18n-attrs="aria-label title">{{template "i_search" .}}</button>
@@ -136,6 +138,7 @@
     <a class="btn topbar-icon visit-store" href="/" target="_blank" rel="noopener" aria-label="访问店铺" title="访问店铺" data-admin-i18n-attrs="aria-label title">{{template "i_external" .}}</a>
   </div>
 </header>
+{{if .User}}{{template "update_dialog" .}}{{end}}
 <dialog class="admin-help-dialog" aria-labelledby="admin-help-title"><div class="panel-head"><h2 id="admin-help-title"><span data-admin-i18n>经营帮助</span></h2><button class="btn sm ghost" type="button" data-help-close aria-label="关闭帮助" data-admin-i18n-attrs="aria-label"><span data-admin-i18n>关闭 · Esc</span></button></div><div class="panel-body"><p class="muted"><span data-admin-i18n>从上架到交付，常用操作都在这里。</span></p><a href="/admin/products"><span class="quick-icon">{{template "i_box" .}}</span><span><b><span data-admin-i18n>商品与库存</span></b><small><span data-admin-i18n>编辑商品，在商品详情中导入卡密。</span></small></span>{{template "i_chevron_right" .}}</a><a href="/admin/orders"><span class="quick-icon">{{template "i_receipt" .}}</span><span><b><span data-admin-i18n>处理订单</span></b><small><span data-admin-i18n>筛选待支付或待补发订单，查看交付记录。</span></small></span>{{template "i_chevron_right" .}}</a><a href="/admin/account"><span class="quick-icon">{{template "i_shield" .}}</span><span><b><span data-admin-i18n>账号安全</span></b><small><span data-admin-i18n>更新密码，启用两步验证。</span></small></span>{{template "i_chevron_right" .}}</a><div class="help-tip"><span data-admin-i18n>按 Ctrl / ⌘ + K，可快速查找后台功能。</span></div></div></dialog>
 <dialog class="workspace-command" aria-labelledby="command-title">
   <div class="workspace-section-head"><h2 id="command-title"><span data-admin-i18n>查找后台功能</span></h2><button type="button" class="btn ghost sm" data-command-close aria-label="关闭功能查找" data-admin-i18n-attrs="aria-label"><span data-admin-i18n>关闭 · Esc</span></button></div>

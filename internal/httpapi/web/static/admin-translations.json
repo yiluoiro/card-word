@@ -778,5 +778,15 @@
   "异步通知地址：": "Notification URL:",
   "可多选；买家在结账时选择其中一种。": "Select multiple methods; buyers choose one at checkout.",
   "启用后即可在结账页选择；本店使用自己的收款配置。": "Enable a provider to offer it at checkout. This store uses its own payment settings.",
-  "已收款订单金额汇总": "Total value of paid orders"
+  "已收款订单金额汇总": "Total value of paid orders",
+  "检查项目更新": "Check for project updates",
+  "项目更新": "Project updates",
+  "当前版本": "Current version",
+  "更新内容": "Release notes",
+  "在 GitHub 查看此版本": "View release on GitHub",
+  "更新仓库": "Update repository",
+  "可信 GitHub 仓库地址": "Trusted GitHub repository URL",
+  "只绑定你信任的仓库。安装更新会在本机运行该仓库发布的程序。": "Only bind a repository you trust. Installing an update runs its program on this server.",
+  "保存仓库": "Save repository",
+  "检查更新": "Check for updates"
 }

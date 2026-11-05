@@ -21,11 +21,14 @@ import (
 	"github.com/yiluoiro/card-word/internal/plugin"
 
 	"github.com/yiluoiro/card-word/internal/store"
+	"github.com/yiluoiro/card-word/internal/update"
 	"github.com/yiluoiro/card-word/internal/version"
 )
 
 // Server holds every dependency the HTTP handlers need.
 type Server struct {
+	updates   *update.Manager
+	restart   func()
 	cfg       *config.Config
 	db        *store.DB
 	log       *slog.Logger
@@ -57,6 +60,8 @@ type Server struct {
 
 // Deps bundles the collaborators passed to New.
 type Deps struct {
+	Updates   *update.Manager
+	Restart   func()
 	Config    *config.Config
 	DB        *store.DB
 	Logger    *slog.Logger
@@ -78,6 +83,7 @@ func New(d Deps) (*Server, error) {
 		log = slog.Default()
 	}
 	s := &Server{
+		updates: d.Updates, restart: d.Restart,
 		cfg:       d.Config,
 		db:        d.DB,
 		log:       log,
@@ -127,6 +133,10 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() {
+	s.mux.Handle("GET /admin/update", s.staff(store.RoleViewer, s.handleUpdateCheck))
+	s.mux.Handle("POST /admin/update/repository", s.staff(store.RoleOwner, s.handleUpdateRepository))
+	s.mux.Handle("POST /admin/update/install", s.staff(store.RoleOwner, s.handleUpdateInstall))
+	s.mux.Handle("POST /admin/update/restart", s.staff(store.RoleOwner, s.handleUpdateRestart))
 	s.mux.Handle("GET /admin/announcements", s.staff(store.RoleViewer, s.handleAnnouncements))
 	s.mux.Handle("POST /admin/announcements", s.staff(store.RoleAdmin, s.handleAnnouncementSave))
 	s.mux.Handle("POST /admin/announcements/{id}/delete", s.staff(store.RoleAdmin, s.handleAnnouncementDelete))
@@ -295,6 +305,7 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"name":    "card word",
 		"version": version.Version,

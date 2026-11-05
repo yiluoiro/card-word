@@ -1,0 +1,39 @@
+name: Publish update binaries
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Validate stable tag and test
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          go test ./...
+      - name: Build standalone executables
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p release-assets
+          for os in linux windows darwin; do
+            for arch in amd64 arm64; do
+              name="cardword_${GITHUB_REF_NAME}_${os}_${arch}"
+              if [[ "$os" == windows ]]; then name+=".exe"; fi
+              GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w -X github.com/yiluoiro/card-word/internal/version.Version=$GITHUB_REF_NAME -X github.com/yiluoiro/card-word/internal/version.Commit=$GITHUB_SHA" -o "release-assets/$name" ./cmd/cardword
+            done
+          done
+      - name: Publish all binaries and release notes together
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=(--generate-notes)
+          if [[ -f "docs/releases/$GITHUB_REF_NAME.md" ]]; then flags=(--notes-file "docs/releases/$GITHUB_REF_NAME.md"); fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Card Word $GITHUB_REF_NAME" "${flags[@]}" release-assets/*

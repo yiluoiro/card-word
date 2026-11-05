@@ -208,3 +208,9 @@ html[data-admin-language=en] .app .dashboard-heading .sub{font-size:13px}
 .app .seo-preview{display:grid;gap:4px;border:1px solid var(--desk-border);border-radius:14px;background:var(--surface-2);padding:16px 20px;min-width:0;overflow-wrap:anywhere}
 .app .seo-preview small,.app .seo-preview p{color:var(--desk-muted);margin:0}
 .app .seo-preview strong{color:var(--primary);font-size:18px}
+.app .version-trigger{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--primary);font-weight:650}
+#project-update{width:min(32rem,calc(100vw - 2rem));max-height:85vh;overflow:auto;padding:0;color:var(--text);background:var(--desk-surface);border:1px solid var(--desk-border);border-radius:16px}
+#project-update::backdrop{background:rgb(15 23 42 / 50%)}
+#project-update .panel-head{display:flex;align-items:center;justify-content:space-between}#project-update .panel-body{display:grid;gap:1rem}
+#project-update p,#project-update h3{margin:0}#project-update pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:32vh;overflow:auto;font:inherit;background:var(--surface-2);padding:.8rem;border-radius:8px}
+#project-update [hidden]{display:none!important}#project-update summary{cursor:pointer}#project-update form{display:grid;gap:.6rem;margin-top:.6rem}#project-update .actions{justify-content:flex-end}

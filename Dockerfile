@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-ARG VERSION=0.1.0
+ARG VERSION=v1.0.0
 ARG COMMIT=unknown
 RUN CGO_ENABLED=0 go build -trimpath \
       -ldflags "-s -w -X github.com/yiluoiro/card-word/internal/version.Version=${VERSION} -X github.com/yiluoiro/card-word/internal/version.Commit=${COMMIT}" \

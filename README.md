@@ -54,11 +54,17 @@ docker compose exec cardword cat /data/install-token.txt
 
 ## 验证与发布
 
+**后台更新（从 v1.0.0 开始）**：登录后点击顶部版本号可立即检查。后台默认读取本项目 GitHub 仓库的最新正式 Release；发现新版本时弹窗显示发布说明。店主可在弹窗中更换可信公开仓库。选择「安装更新」后，系统按操作系统和架构下载程序并验证 GitHub 提供的 SHA-256；旧版本继续运行。选择「重启并生效」后，程序会等待现有请求结束、关闭数据库，再启动新版本。若新程序在数据库和监听端口就绪前启动失败，将重新启动旧版本。
+
+首次从不带更新器的旧版升级，请先按原部署方式安装 v1.0.0。更新文件保存在数据目录的 `updates/`，该目录须允许服务账号写入和执行；容器重建时请保留数据卷。升级前备份数据。程序回退不会撤销数据库迁移。
+
+**发布后续更新**：为经过测试的提交推送正式标签（如 `v1.0.1`）。发布工作流会构建 Linux、Windows、macOS 的 amd64/arm64 程序并创建 Release。可预先在 `docs/releases/<标签>.md` 填写更新内容；没有此文件时使用 GitHub 自动生成的说明。只推送代码不会触发客户端安装。
+
 ```bash
 go test ./... -count=1
 go vet ./...
 python scripts/package_source.py
-python scripts/build_baota.py --panel --version 0.1.0-community
+python scripts/build_baota.py --panel --version v1.0.0
 ```
 
 源码包在 `dist/cardword-community-source.zip`；宝塔包在 `dist/releases/`。打包脚本只收集明确列出的源码、静态资源和部署文件，不包含本地运行数据、密钥或原平台版源码。

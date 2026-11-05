@@ -36,7 +36,7 @@ def pack(package, archive):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="0.1.0-community")
+    parser.add_argument("--version", default="v1.0.0")
     parser.add_argument("--output", type=Path, default=ROOT / "dist" / "releases")
     parser.add_argument("--panel", action="store_true", help="build separate single-binary packages for BaoTa Go project management")
     args = parser.parse_args()

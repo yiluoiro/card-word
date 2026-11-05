@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,11 +23,15 @@ import (
 	"github.com/yiluoiro/card-word/internal/payment"
 	"github.com/yiluoiro/card-word/internal/plugin"
 	"github.com/yiluoiro/card-word/internal/store"
+	"github.com/yiluoiro/card-word/internal/update"
 	"github.com/yiluoiro/card-word/internal/version"
 )
 
 func main() {
 	if err := run(); err != nil {
+		if errors.Is(err, errUpdateRestart) {
+			os.Exit(restartExit)
+		}
 		fmt.Fprintf(os.Stderr, "cardword: %v\n", err)
 		os.Exit(1)
 	}
@@ -40,6 +46,11 @@ func run() error {
 		fmt.Printf("card word %s (%s, built %s)\n", version.Version, version.Commit, version.Date)
 		return nil
 	}
+	if os.Getenv("CARDWORD_INTERNAL_WORKER") != "1" {
+		return supervise(cfg)
+	}
+	updates := update.New(cfg.DataDir, version.Version, cfg.MasterKey)
+	restart := make(chan struct{}, 1)
 
 	logger := newLogger(cfg)
 	slog.SetDefault(logger)
@@ -97,6 +108,13 @@ func run() error {
 		Payments:  payments,
 		Notifier:  notifier,
 		Templates: tmpl,
+		Updates:   updates,
+		Restart: func() {
+			select {
+			case restart <- struct{}{}:
+			default:
+			}
+		},
 	})
 	if err != nil {
 		return err
@@ -121,6 +139,8 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// EOF also shuts down an orphaned worker if the launcher is terminated.
+	go func() { _, _ = io.Copy(io.Discard, os.Stdin); stop() }()
 
 	var background sync.WaitGroup
 	background.Add(1)
@@ -131,14 +151,28 @@ func run() error {
 	}()
 
 	errCh := make(chan error, 1)
+	listener, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+	if os.Getenv("CARDWORD_INTERNAL_TRIAL") == "true" {
+		if err := updates.Confirm(); err != nil {
+			return err
+		}
+	}
 	go func() {
 		logger.Info("http server listening", "addr", cfg.Addr, "base_url", cfg.BaseURL)
-		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
 
+	updating := false
 	select {
+	case <-restart:
+		updating = true
+		stop()
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
@@ -155,6 +189,9 @@ func run() error {
 		logger.Warn("wal checkpoint failed", "error", err)
 	}
 	logger.Info("stopped cleanly")
+	if updating {
+		return errUpdateRestart
+	}
 	return nil
 }
 
