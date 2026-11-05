@@ -1,4 +1,8 @@
-# Card Word Community
+<p align="center">
+  <img src="./internal/httpapi/web/static/reference/brand.svg" width="96" alt="Card Word 标志">
+</p>
+<h1 align="center">Card Word Community</h1>
+<p align="center"><strong>简体中文</strong> · <a href="./docs/README.en.md">English</a></p>
 
 可自部署的单店铺自动发卡系统。Go 单二进制、SQLite 数据库、内嵌前后台，无需 Node.js、PHP 或 MySQL。前台和后台沿用 Card Word 原版界面，默认使用经典商店首页，也可在「店铺装修」选择其他内置模板。
 
@@ -64,3 +68,9 @@ python scripts/build_baota.py --panel --version 0.1.0-community
 ## 授权
 
 本目录按 [Apache License 2.0](LICENSE) 开源，保留 Card Word 原有署名。第三方依赖与品牌标识的权利归其各自权利人；详见 [NOTICE](NOTICE)。上级目录的平台版不属于本开源发行包。
+
+## 免责声明
+
+本项目提供自部署店铺软件。每家店铺由其运营者独立管理；项目维护者不参与店铺交易，也不代收款或处理退款。运营者应确认有权销售所上架的商品，妥善保管买家数据和支付密钥，并负责交付与售后。买家如遇订单问题，请联系下单店铺。
+
+软件按“现状”提供，担保与责任限制以 [Apache License 2.0 第 7、8 条](LICENSE) 为准。本说明不改变许可证授予的权利。
