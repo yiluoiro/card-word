@@ -6,6 +6,18 @@
 
 Card Word Community is a self-hosted shop for selling digital goods and delivering codes after payment. The storefront and admin console are embedded in a single Go binary backed by SQLite. No Node.js, PHP, or MySQL is required. The classic Card Word storefront is the default; the owner can choose another built-in design in the admin console.
 
+## Screenshots
+
+These screenshots show the original Card Word interface. The single-store Community edition uses the same design and omits the merchant signup link and the Platform menu shown here.
+
+**Storefront**
+
+![Card Word storefront with a digital gift card banner and featured brands](./screenshots/storefront.png)
+
+**Admin dashboard**
+
+![Card Word admin dashboard showing order counts, revenue, and order trends](./screenshots/admin-dashboard.png)
+
 ## Features
 
 - Manage products, categories, variants, code inventory, and coupons. Buyers can look up their orders and retrieve their codes.
